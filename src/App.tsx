@@ -14,6 +14,7 @@ import { useSiteSettings } from "./hooks/useSiteSettings";
 // Index is the landing page — kept eager so first paint has no waterfall
 import Index from "./pages/Index";
 const StayDetails   = lazy(() => import("./pages/StayDetails"));
+const CategoryPage  = lazy(() => import("./pages/CategoryPage"));
 const Wishlist      = lazy(() => import("./pages/Wishlist"));
 const NotFound      = lazy(() => import("./pages/NotFound"));
 // ─── Admin pages (heavy — only loaded when the user navigates to /admin) ─────
@@ -105,6 +106,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<MaintenanceGate><Index /></MaintenanceGate>} />
               <Route path="/stay/:id" element={<MaintenanceGate><StayDetails /></MaintenanceGate>} />
+              <Route path="/category/:slug" element={<MaintenanceGate><CategoryPage /></MaintenanceGate>} />
               <Route path="/wishlist" element={<MaintenanceGate><Wishlist /></MaintenanceGate>} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/create" element={<AdminCreate />} />

@@ -77,7 +77,7 @@ const StayCard = ({ stay, index }: StayCardProps) => {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ delay: index * 0.05 }}
-      className="shrink-0 w-[220px] md:w-auto md:shrink rounded-2xl overflow-hidden bg-card shadow-card transition-shadow hover:shadow-elevated snap-start"
+      className="shrink-0 w-[220px] md:w-[300px] lg:w-[230px] xl:w-[256px] rounded-2xl overflow-hidden bg-card shadow-card transition-shadow hover:shadow-elevated snap-start"
     >
       {/* Image Slider */}
       <div
