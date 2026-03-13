@@ -1,0 +1,8 @@
+
+ALTER TABLE public.bookings
+  ADD COLUMN IF NOT EXISTS adults integer NOT NULL DEFAULT 2,
+  ADD COLUMN IF NOT EXISTS children integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pets integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS solo_traveller boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS group_booking boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS group_name text DEFAULT '';

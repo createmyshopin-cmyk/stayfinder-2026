@@ -1,0 +1,115 @@
+Let me explore the current database schema to give you a comprehensive overview.
+
+Here is a complete overview of your database schema:
+
+---
+
+## Database Schema Overview
+
+Your project has **24 tables**, **3 functions**, **1 enum**, and **2 storage buckets**. Here's the full breakdown:
+
+---
+
+### Core Business Tables
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| **stays** | Property listings | name, location, category, price, original_price, rating, amenities[], images[], description, status, stay_id, tenant_id |
+| **room_categories** | Room types per stay | name, price, original_price, max_guests, available, amenities[], images[], stay_id |
+| **bookings** | Guest reservations | booking_id, guest_name, email, phone, checkin, checkout, rooms (JSON), addons (JSON), total_price, adults, children, pets, solo_traveller, group_booking, group_name, status |
+| **add_ons** | Extra services per stay | name, price, category, description, image_url, active, stay_id |
+| **calendar_pricing** | Dynamic pricing per date | date, price, original_price, available, is_blocked, min_nights, room_category_id, stay_id |
+| **reviews** | Guest reviews | guest_name, rating, comment, photos[], avatar_url, status, stay_id |
+| **stay_reels** | Video content per stay | url, platform, title, thumbnail, sort_order, stay_id |
+| **nearby_destinations** | Attractions near stays | name, image, distance, sort_order, stay_id |
+| **coupons** | Discount codes | code, type, value, min_purchase, max_discount, usage_count, active |
+
+### Financial Tables
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| **quotations** | Price quotes for guests | quote_id, guest_name, rooms (JSON), addons (JSON), room_total, addons_total, discount, total_price, status, notes |
+| **invoices** | Payment invoices | invoice_id, guest_name, rooms (JSON), addons (JSON), room_total, addons_total, discount, total_price, payment_status, payment_notes |
+| **transactions** | Payment records | transaction_id, amount, currency, payment_gateway, payment_method, status, subscription_id |
+
+### Multi-Tenant / SaaS Tables
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| **tenants** | Tenant accounts | tenant_name, owner_name, email, phone, domain, plan_id, status, logo_url, primary_color, secondary_color, favicon_url, footer_text |
+| **plans** | Subscription plans | plan_name, price, billing_cycle, max_stays, max_rooms, max_bookings_per_month, max_ai_search, feature_flags (JSON), status |
+| **subscriptions** | Active subscriptions | plan_id, tenant_id, status, start_date, renewal_date, billing_cycle, payment_gateway, razorpay_subscription_id, scheduled_plan_id |
+| **tenant_usage** | Resource usage tracking | stays_created, rooms_created, bookings_this_month, ai_search_count, storage_used, last_reset |
+| **plan_features** | Feature toggles per plan | plan_id, feature_key, enabled |
+| **features** | Available platform features | feature_name, feature_key, description, status |
+| **tenant_domains** | Custom domains | subdomain, custom_domain, verified, ssl_status, registrar, auto_configured |
+| **tenant_registrar_keys** | Domain registrar API keys | registrar, api_key, api_secret |
+
+### Configuration & Admin Tables
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| **site_settings** | Frontend settings | site_name, contact_email, contact_phone, whatsapp_number, currency, booking_enabled, maintenance_mode, social links, sticky menu flags |
+| **ai_settings** | AI feature config | ai_model, system_prompt, ai_personality, search_enabled, feature flags, cache settings, recommendation_logic |
+| **ai_synonyms** | Search term mapping | query_term, maps_to |
+| **ai_search_logs** | AI search analytics | query, filters, results_count |
+| **stay_categories** | Category taxonomy | label, icon, sort_order, active |
+| **announcements** | Platform announcements | title, message, type, target, published, expires_at |
+| **media** | Media gallery | url, alt_text, category, stay_id |
+| **saas_platform_settings** | Platform-level settings | setting_key, setting_value |
+
+### Auth & Security
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| **user_roles** | Role-based access | user_id, role (enum: admin, moderator, user, super_admin) |
+
+---
+
+### Database Functions
+
+| Function | Purpose |
+|----------|---------|
+| `has_role(user_id, role)` | Check if user has a specific role (security definer) |
+| `resolve_stay_uuid(stay_id)` | Convert stay_id string to UUID |
+| `resolve_stay_uuid_flexible(stay_id, stay_name)` | Flexible stay lookup by ID or name |
+
+### Storage Buckets
+
+| Bucket | Public | Purpose |
+|--------|--------|---------|
+| `branding` | Yes | Tenant logos, favicons |
+| `stay-images` | Yes | Stay property photos |
+
+### Edge Functions (10)
+
+`ai-search`, `razorpay-create-order`, `razorpay-verify-payment`, `razorpay-create-subscription`, `verify-domain`, `subscription-renewal-cron`, `auto-configure-domain`, `entri-token`, `seed-admin`, `normalize-calendar-pricing`
+
+---
+
+### Key Relationships
+
+```text
+tenants ──┬── stays ──┬── room_categories
+          │           ├── bookings
+          │           ├── add_ons
+          │           ├── calendar_pricing
+          │           ├── reviews
+          │           ├── stay_reels
+          │           ├── nearby_destinations
+          │           └── media
+          ├── plans ──┬── plan_features
+          │           └── subscriptions
+          ├── tenant_usage
+          ├── tenant_domains
+          ├── transactions
+          └── coupons
+
+bookings ──┬── quotations
+           └── invoices
+```
+
+This is a fully multi-tenant SaaS platform for property/stay management with subscription billing via Razorpay, AI-powered search, dynamic calendar pricing, and custom domain support.
+
+Extend database schema
+Audit RLS policies

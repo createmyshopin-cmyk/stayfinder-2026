@@ -1,0 +1,317 @@
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
+import { RefreshCw, Plus, Eye, Building2, CreditCard, RotateCcw, ShieldOff, CalendarPlus, Globe, Zap } from "lucide-react";
+import { initiateRazorpayCheckout } from "@/lib/razorpay";
+import { format } from "date-fns";
+
+interface Plan { id: string; plan_name: string; price: number; max_stays: number; max_rooms: number; max_bookings_per_month: number; max_ai_search: number; }
+interface Tenant { id: string; tenant_name: string; owner_name: string; email: string; phone: string; domain: string; plan_id: string | null; status: string; created_at: string; }
+interface TenantUsage { tenant_id: string; stays_created: number; rooms_created: number; bookings_this_month: number; ai_search_count: number; storage_used: number; }
+
+const statusVariant = (s: string) => {
+  switch (s) { case "active": return "default" as const; case "trial": return "secondary" as const; case "expired": case "cancelled": case "suspended": return "destructive" as const; default: return "outline" as const; }
+};
+
+const limitLabel = (v: number) => v === -1 ? "Unlimited" : v.toString();
+
+const SaasAdminTenants = () => {
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [usages, setUsages] = useState<TenantUsage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [viewTenant, setViewTenant] = useState<Tenant | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ tenant_name: "", owner_name: "", email: "", phone: "", domain: "", plan_id: "" });
+
+  useEffect(() => { fetchAll(); }, []);
+
+  const fetchAll = async () => {
+    setLoading(true);
+    const [t, p, u] = await Promise.all([
+      supabase.from("tenants").select("*").order("created_at", { ascending: false }),
+      supabase.from("plans").select("*").order("price"),
+      supabase.from("tenant_usage").select("*"),
+    ]);
+    if (t.data) setTenants(t.data as Tenant[]);
+    if (p.data) setPlans(p.data as Plan[]);
+    if (u.data) setUsages(u.data as TenantUsage[]);
+    setLoading(false);
+  };
+
+  const getPlan = (id: string | null) => plans.find(p => p.id === id);
+  const getUsage = (id: string) => usages.find(u => u.tenant_id === id);
+
+  const addTenant = async () => {
+    if (!form.tenant_name) return;
+    const { error } = await supabase.from("tenants").insert({ ...form, plan_id: form.plan_id || null, status: "trial" });
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    toast({ title: "Tenant created" });
+    setShowAdd(false);
+    setForm({ tenant_name: "", owner_name: "", email: "", phone: "", domain: "", plan_id: "" });
+    fetchAll();
+  };
+
+  const updateStatus = async (id: string, status: string) => {
+    await supabase.from("tenants").update({ status }).eq("id", id);
+    // Also update subscription status
+    if (status === "suspended" || status === "cancelled") {
+      await supabase.from("subscriptions").update({ status }).eq("tenant_id", id);
+    }
+    toast({ title: `Status → ${status}` });
+    fetchAll();
+  };
+
+  const upgradePlan = async (tenantId: string, planId: string) => {
+    await supabase.from("tenants").update({ plan_id: planId }).eq("id", tenantId);
+    // Update subscription too
+    const { data: sub } = await supabase.from("subscriptions").select("id").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(1).single();
+    if (sub) {
+      await supabase.from("subscriptions").update({ plan_id: planId, status: "active" }).eq("id", sub.id);
+    }
+    toast({ title: "Plan updated" });
+    fetchAll();
+  };
+
+  const resetUsage = async (tenantId: string) => {
+    await supabase.from("tenant_usage").update({
+      stays_created: 0, rooms_created: 0, bookings_this_month: 0, ai_search_count: 0, storage_used: 0, last_reset: new Date().toISOString(),
+    }).eq("tenant_id", tenantId);
+    toast({ title: "Usage reset" });
+    fetchAll();
+  };
+
+  const extendTrial = async (tenantId: string) => {
+    const newRenewal = new Date();
+    newRenewal.setDate(newRenewal.getDate() + 14);
+    const { data: sub } = await supabase.from("subscriptions").select("id").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(1).single();
+    if (sub) {
+      await supabase.from("subscriptions").update({
+        status: "trial",
+        renewal_date: newRenewal.toISOString().split("T")[0],
+      }).eq("id", sub.id);
+    }
+    await supabase.from("tenants").update({ status: "trial" }).eq("id", tenantId);
+    toast({ title: "Trial extended by 14 days" });
+    fetchAll();
+  };
+
+  const forceDomainVerify = async (tenantId: string) => {
+    await supabase.from("tenant_domains").update({ verified: true, ssl_status: "active" }).eq("tenant_id", tenantId);
+    toast({ title: "Domain force-verified" });
+  };
+
+  const filtered = tenants.filter(t =>
+    t.tenant_name.toLowerCase().includes(search.toLowerCase()) ||
+    t.email.toLowerCase().includes(search.toLowerCase()) ||
+    t.owner_name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) return <div className="flex items-center justify-center py-20"><RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><Building2 className="w-6 h-6 text-primary" /> Tenants</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage all platform tenants</p>
+        </div>
+        <Button onClick={() => setShowAdd(true)}><Plus className="w-4 h-4 mr-1" /> Add Tenant</Button>
+      </div>
+
+      <Input placeholder="Search tenants..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-sm" />
+
+      {filtered.length === 0 ? (
+        <Card><CardContent className="py-12 text-center text-muted-foreground">No tenants found</CardContent></Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tenant</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Plan</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Domain</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map(t => (
+                    <TableRow key={t.id}>
+                      <TableCell className="font-medium">{t.tenant_name}</TableCell>
+                      <TableCell>{t.owner_name || "—"}</TableCell>
+                      <TableCell className="text-xs">{t.email || "—"}</TableCell>
+                      <TableCell>{getPlan(t.plan_id)?.plan_name || "—"}</TableCell>
+                      <TableCell>
+                        <Select value={t.status} onValueChange={v => updateStatus(t.id, v)}>
+                          <SelectTrigger className="w-[120px] h-8"><Badge variant={statusVariant(t.status)}>{t.status}</Badge></SelectTrigger>
+                          <SelectContent>
+                            {["trial", "active", "expired", "suspended", "cancelled"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-xs">{t.domain || "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{format(new Date(t.created_at), "dd MMM yyyy")}</TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost" onClick={() => setViewTenant(t)}><Eye className="w-4 h-4" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add Tenant Dialog */}
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Add New Tenant</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Business Name *</Label><Input value={form.tenant_name} onChange={e => setForm({ ...form, tenant_name: e.target.value })} className="mt-1" /></div>
+            <div><Label>Owner Name</Label><Input value={form.owner_name} onChange={e => setForm({ ...form, owner_name: e.target.value })} className="mt-1" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Email</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="mt-1" /></div>
+              <div><Label>Phone</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="mt-1" /></div>
+            </div>
+            <div><Label>Domain</Label><Input value={form.domain} onChange={e => setForm({ ...form, domain: e.target.value })} className="mt-1" placeholder="booking.resort.com" /></div>
+            <div>
+              <Label>Plan</Label>
+              <Select value={form.plan_id} onValueChange={v => setForm({ ...form, plan_id: v })}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select plan" /></SelectTrigger>
+                <SelectContent>{plans.map(p => <SelectItem key={p.id} value={p.id}>{p.plan_name} — ₹{p.price}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button onClick={addTenant}>Add Tenant</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Tenant Detail */}
+      {viewTenant && (
+        <Dialog open={!!viewTenant} onOpenChange={() => setViewTenant(null)}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" /> {viewTenant.tenant_name}
+              </DialogTitle>
+              <DialogDescription>Manage tenant settings, plan, and usage</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground">Owner:</span> {viewTenant.owner_name || "—"}</div>
+                <div><span className="text-muted-foreground">Email:</span> {viewTenant.email || "—"}</div>
+                <div><span className="text-muted-foreground">Phone:</span> {viewTenant.phone || "—"}</div>
+                <div><span className="text-muted-foreground">Domain:</span> {viewTenant.domain || "—"}</div>
+                <div><span className="text-muted-foreground">Status:</span> <Badge variant={statusVariant(viewTenant.status)}>{viewTenant.status}</Badge></div>
+                <div><span className="text-muted-foreground">Created:</span> {format(new Date(viewTenant.created_at), "dd MMM yyyy")}</div>
+              </div>
+
+              {/* Upgrade Plan */}
+              <div>
+                <Label>Change Plan</Label>
+                <Select value={viewTenant.plan_id || "no-plan"} onValueChange={v => { if (v !== "no-plan") upgradePlan(viewTenant.id, v); }}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select plan" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="no-plan" disabled>Select plan</SelectItem>
+                    {plans.map(p => <SelectItem key={p.id} value={p.id}>{p.plan_name} — ₹{p.price}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Usage */}
+              {(() => {
+                const usage = getUsage(viewTenant.id);
+                const plan = getPlan(viewTenant.plan_id);
+                if (!usage || !plan) return <p className="text-sm text-muted-foreground">No usage data</p>;
+                return (
+                  <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm">Usage</CardTitle></CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <div className="flex justify-between"><span>Stays</span><span>{usage.stays_created} / {limitLabel(plan.max_stays)}</span></div>
+                      <div className="flex justify-between"><span>Rooms</span><span>{usage.rooms_created} / {limitLabel(plan.max_rooms)}</span></div>
+                      <div className="flex justify-between"><span>Bookings (month)</span><span>{usage.bookings_this_month} / {limitLabel(plan.max_bookings_per_month)}</span></div>
+                      <div className="flex justify-between"><span>AI Searches</span><span>{usage.ai_search_count} / {limitLabel(plan.max_ai_search)}</span></div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
+              {/* Admin Controls */}
+              <div className="border-t pt-4">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Admin Controls</Label>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <Button size="sm" variant="outline" onClick={() => extendTrial(viewTenant.id)}>
+                    <CalendarPlus className="w-3 h-3 mr-1" /> Extend Trial
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => resetUsage(viewTenant.id)}>
+                    <RotateCcw className="w-3 h-3 mr-1" /> Reset Usage
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => forceDomainVerify(viewTenant.id)}>
+                    <Globe className="w-3 h-3 mr-1" /> Force Verify Domain
+                  </Button>
+                  {viewTenant.plan_id && (
+                    <Button size="sm" variant="outline" onClick={() => {
+                      const plan = getPlan(viewTenant.plan_id);
+                      if (!plan) return;
+                      initiateRazorpayCheckout({
+                        tenantId: viewTenant.id,
+                        planId: plan.id,
+                        planName: plan.plan_name,
+                        amount: plan.price,
+                        tenantName: viewTenant.tenant_name,
+                        email: viewTenant.email,
+                        phone: viewTenant.phone,
+                        onSuccess: (txId) => {
+                          toast({ title: "Payment successful!", description: `Transaction: ${txId}` });
+                          setViewTenant(null);
+                          fetchAll();
+                        },
+                        onError: (err) => {
+                          toast({ title: "Payment failed", description: err, variant: "destructive" });
+                        },
+                      });
+                    }}>
+                      <CreditCard className="w-3 h-3 mr-1" /> Pay via Razorpay
+                    </Button>
+                  )}
+                </div>
+                <div className="flex gap-2 mt-3">
+                  {viewTenant.status !== "suspended" ? (
+                    <Button variant="destructive" size="sm" onClick={() => { updateStatus(viewTenant.id, "suspended"); setViewTenant(null); }}>
+                      <ShieldOff className="w-3 h-3 mr-1" /> Suspend Tenant
+                    </Button>
+                  ) : (
+                    <Button variant="default" size="sm" onClick={() => { updateStatus(viewTenant.id, "active"); setViewTenant(null); }}>
+                      <Zap className="w-3 h-3 mr-1" /> Reactivate
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+};
+
+export default SaasAdminTenants;

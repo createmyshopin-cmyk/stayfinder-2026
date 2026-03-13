@@ -1,0 +1,25 @@
+project_id = "rqnxtcigfauzzjaqxzut"
+
+[functions.ai-search]
+verify_jwt = false
+
+[functions.razorpay-create-order]
+verify_jwt = false
+
+[functions.razorpay-verify-payment]
+verify_jwt = false
+
+[functions.razorpay-create-subscription]
+verify_jwt = false
+
+[functions.verify-domain]
+verify_jwt = false
+
+[functions.subscription-renewal-cron]
+verify_jwt = false
+
+[functions.auto-configure-domain]
+verify_jwt = false
+
+[functions.entri-token]
+verify_jwt = false
