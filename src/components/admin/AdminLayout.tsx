@@ -2,7 +2,13 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "./AdminSidebar";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { SubscriptionBanner } from "./SubscriptionBanner";
+import { useBookingNotification } from "@/hooks/useBookingNotification";
 import { Outlet } from "react-router-dom";
+
+function BookingNotificationListener() {
+  useBookingNotification();
+  return null;
+}
 
 export function AdminLayout() {
   const { loading, isAdmin, signOut } = useAdminAuth();
@@ -19,6 +25,7 @@ export function AdminLayout() {
 
   return (
     <SidebarProvider>
+      <BookingNotificationListener />
       <div className="min-h-screen flex w-full bg-muted/30">
         <AdminSidebar onSignOut={signOut} />
         <div className="flex-1 flex flex-col">

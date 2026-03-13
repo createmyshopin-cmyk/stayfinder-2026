@@ -137,11 +137,11 @@ const ListingCard = ({ stay, index }: { stay: Stay; index: number }) => {
           <div className="flex items-start justify-between gap-3 mb-1">
             <h2 className="text-base md:text-lg font-bold text-foreground leading-tight">{stay.name}</h2>
             {isPremium ? (
-              <span className="shrink-0 flex items-center gap-1 bg-foreground text-background text-[10px] font-bold px-2.5 py-1 rounded-full">
+              <span className="shrink-0 flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full">
                 <Crown className="w-3 h-3" /> PREMIUM
               </span>
             ) : (
-              <span className="shrink-0 flex items-center gap-1 border border-primary text-primary text-[10px] font-bold px-2.5 py-1 rounded-full">
+              <span className="shrink-0 flex items-center gap-1 border border-primary/50 text-primary text-[10px] font-bold px-2.5 py-1 rounded-full">
                 <Award className="w-3 h-3" /> STANDARD
               </span>
             )}
@@ -195,7 +195,7 @@ const ListingCard = ({ stay, index }: { stay: Stay; index: number }) => {
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); navigate(`/stay/${stay.id}`); }}
-            className="bg-foreground text-background text-xs font-bold px-6 py-2.5 rounded-full hover:opacity-90 active:scale-95 transition-all"
+            className="bg-primary text-primary-foreground text-xs font-bold px-6 py-2.5 rounded-full hover:opacity-90 active:scale-95 transition-all"
           >
             EXPLORE
           </button>
@@ -336,7 +336,7 @@ const CategoryPage = () => {
               onClick={() => setSort(key)}
               className={`shrink-0 flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold transition-all ${
                 sort === key
-                  ? "bg-foreground text-background"
+                  ? "bg-primary text-primary-foreground"
                   : "border border-border text-foreground hover:border-foreground"
               }`}
             >
@@ -404,7 +404,7 @@ const CategoryPage = () => {
               {/* Apply (mobile) */}
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="md:hidden w-full bg-foreground text-background text-xs font-bold py-2.5 rounded-full"
+                className="md:hidden w-full bg-primary text-primary-foreground text-xs font-bold py-2.5 rounded-full"
               >
                 Apply Filters
               </button>
