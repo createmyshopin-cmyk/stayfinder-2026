@@ -30,7 +30,8 @@ async function resolveTenant(): Promise<{ id: string; name: string } | null> {
   if (
     hostname === "localhost" ||
     hostname.includes("lovable.app") ||
-    hostname.includes("lovableproject.com")
+    hostname.includes("lovableproject.com") ||
+    hostname.includes("vercel.app")
   ) {
     return null;
   }

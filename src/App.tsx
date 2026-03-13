@@ -87,7 +87,7 @@ const PageLoader = () => (
  */
 const MaintenanceGate = ({ children }: { children: React.ReactNode }) => {
   const { settings, loading } = useSiteSettings();
-  if (loading) return null; // BrandingContext already shows a global loader
+  if (loading) return <PageLoader />;
   if (settings?.maintenance_mode) return <MaintenancePage />;
   return <>{children}</>;
 };
