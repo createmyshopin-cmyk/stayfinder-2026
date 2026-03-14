@@ -6,16 +6,22 @@ EAS is configured to use **local credentials** for Android builds. This avoids t
 
 ### 1. Generate an Android keystore
 
-From the `mobile` directory, run (requires Java/javac):
+From the `mobile` directory:
 
+**Option A — npm script (if Java is installed):**
 ```powershell
-keytool -genkey -v -storetype JKS -keyalg RSA -keysize 2048 -validity 10000 ^
-  -alias my-key-alias ^
-  -keystore keystores/release.keystore ^
-  -dname "CN=Stay Admin, OU=, O=, L=, S=, C=US"
+cd mobile
+npm run setup:keystore
 ```
 
-You'll be prompted for a keystore password and key password — remember these.
+**Option B — Manual (requires Java JDK):**
+```powershell
+# Install Java first: winget install EclipseAdoptium.Temurin.17.JDK
+cd mobile
+keytool -genkeypair -v -storetype PKCS12 -keystore keystores/release.keystore -alias stay-admin -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Stay Admin, OU=, O=, L=, S=, C=US"
+```
+
+You'll be prompted for a keystore password and key password — remember these for step 2.
 
 ### 2. Create credentials.json
 
@@ -26,11 +32,10 @@ copy credentials.json.example credentials.json
 ```
 
 Edit `credentials.json` and set:
-
-- `keystorePath`: `./keystores/release.keystore` (or your keystore path)
-- `keystorePassword`: keystore password
-- `keyAlias`: `my-key-alias` (or the alias you used)
-- `keyPassword`: key password
+- `keystorePath`: `./keystores/release.keystore`
+- `keystorePassword`: keystore password from step 1
+- `keyAlias`: `stay-admin`
+- `keyPassword`: key password (same as keystore password)
 
 **Important:** `credentials.json` is gitignored. Never commit it.
 
@@ -38,5 +43,5 @@ Edit `credentials.json` and set:
 
 ```powershell
 cd mobile
-eas build --platform android --profile production
+npm run build:android
 ```
