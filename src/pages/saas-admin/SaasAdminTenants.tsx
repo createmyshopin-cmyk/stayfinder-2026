@@ -62,13 +62,15 @@ const SaasAdminTenants = () => {
   };
 
   const updateStatus = async (id: string, status: string) => {
-    await supabase.from("tenants").update({ status }).eq("id", id);
-    // Also update subscription status
-    if (status === "suspended" || status === "cancelled") {
-      await supabase.from("subscriptions").update({ status }).eq("tenant_id", id);
+    const { error } = await supabase.from("tenants").update({ status }).eq("id", id);
+    if (error) {
+      toast({ title: "Failed to update status", description: error.message, variant: "destructive" });
+      return;
     }
-    toast({ title: `Status → ${status}` });
-    fetchAll();
+    // Sync subscription status for all relevant statuses
+    await supabase.from("subscriptions").update({ status }).eq("tenant_id", id);
+    toast({ title: `Status updated to ${status}` });
+    await fetchAll();
   };
 
   const upgradePlan = async (tenantId: string, planId: string) => {
