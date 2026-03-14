@@ -16,6 +16,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.stayadmin.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -48,6 +50,6 @@
         "projectId": "be9aabef-fa67-4067-abad-fae02076704e"
       }
     },
-    "owner": "stayadmin"
+    "owner": "luminads"
   }
 }
