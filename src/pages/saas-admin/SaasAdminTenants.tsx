@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { RefreshCw, Plus, Eye, Building2, CreditCard, RotateCcw, ShieldOff, CalendarPlus, Globe, Zap } from "lucide-react";
+import { RefreshCw, Plus, Eye, Building2, CreditCard, RotateCcw, ShieldOff, CalendarPlus, Globe, Zap, Check, X, Lock } from "lucide-react";
 import { initiateRazorpayCheckout } from "@/lib/razorpay";
 import { format } from "date-fns";
 
@@ -24,6 +24,8 @@ const statusVariant = (s: string) => {
 
 const limitLabel = (v: number) => v === -1 ? "Unlimited" : v.toString();
 
+const slugifySubdomain = (s: string) => s.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/^-+|-+$/g, "");
+
 const PAGE_SIZE = 25;
 
 const SaasAdminTenants = () => {
@@ -36,9 +38,50 @@ const SaasAdminTenants = () => {
   const [page, setPage] = useState(1);
   const [viewTenant, setViewTenant] = useState<Tenant | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ tenant_name: "", owner_name: "", email: "", phone: "", domain: "", plan_id: "" });
+  const [form, setForm] = useState({ tenant_name: "", owner_name: "", email: "", phone: "", domain: "", plan_id: "", password: "", confirmPassword: "" });
+  const [subdomainSuffix, setSubdomainSuffix] = useState(".travelvoo.in");
+  const [subdomainStatus, setSubdomainStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const checkingSlugRef = useRef<string | null>(null);
 
   useEffect(() => { fetchAll(); }, []);
+
+  // Reset form and subdomain state when Add dialog closes
+  useEffect(() => {
+    if (!showAdd) {
+      setForm({ tenant_name: "", owner_name: "", email: "", phone: "", domain: "", plan_id: "", password: "", confirmPassword: "" });
+      setSubdomainStatus("idle");
+      checkingSlugRef.current = null;
+    }
+  }, [showAdd]);
+
+  // Fetch subdomain suffix when Add dialog opens
+  useEffect(() => {
+    if (!showAdd) return;
+    supabase.from("saas_platform_settings").select("setting_value").eq("setting_key", "platform_subdomain_suffix").maybeSingle().then(({ data }) => {
+      if (data?.setting_value) setSubdomainSuffix(data.setting_value);
+    });
+  }, [showAdd]);
+
+  // Real-time subdomain availability check (debounced, with race-condition guard)
+  useEffect(() => {
+    const slug = slugifySubdomain(form.domain);
+    if (!slug || slug.length < 2) {
+      setSubdomainStatus("idle");
+      checkingSlugRef.current = null;
+      return;
+    }
+    setSubdomainStatus("checking");
+    checkingSlugRef.current = slug;
+    const t = setTimeout(async () => {
+      const slugAtCheck = slug;
+      const { data } = await supabase.from("tenant_domains").select("id").eq("subdomain", slugAtCheck).maybeSingle();
+      if (checkingSlugRef.current === slugAtCheck) {
+        setSubdomainStatus(data ? "taken" : "available");
+        checkingSlugRef.current = null;
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [form.domain]);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -62,26 +105,90 @@ const SaasAdminTenants = () => {
 
   const addTenant = async () => {
     if (!form.tenant_name) return;
-    const { data: newTenant, error } = await supabase
-      .from("tenants")
-      .insert({ ...form, plan_id: form.plan_id || null, status: "trial" })
-      .select()
-      .single();
+    const slug = slugifySubdomain(form.domain);
+    if (form.domain.trim() && !slug) {
+      toast({ title: "Invalid subdomain", description: "Use only letters, numbers, and hyphens", variant: "destructive" });
+      return;
+    }
+    if (slug && subdomainStatus === "taken") {
+      toast({ title: "Subdomain taken", description: `"${slug}" is already in use`, variant: "destructive" });
+      return;
+    }
+    if (slug && subdomainStatus === "checking") {
+      toast({ title: "Please wait", description: "Checking subdomain availability...", variant: "destructive" });
+      return;
+    }
+    const hasEmail = !!form.email?.trim();
+    const hasPassword = !!form.password;
+    if (hasEmail !== hasPassword) {
+      toast({ title: "Email & Password", description: "Provide both email and password to create a login, or leave both empty.", variant: "destructive" });
+      return;
+    }
+    if (hasPassword && form.password.length < 6) {
+      toast({ title: "Password too short", description: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    if (hasPassword && form.password !== form.confirmPassword) {
+      toast({ title: "Passwords do not match", variant: "destructive" });
+      return;
+    }
+
+    if (hasEmail && hasPassword) {
+      const { data, error } = await supabase.functions.invoke("create-tenant-admin", {
+        body: {
+          email: form.email.trim(),
+          password: form.password,
+          tenant_name: form.tenant_name.trim(),
+          owner_name: form.owner_name?.trim() || undefined,
+          phone: form.phone?.trim() || undefined,
+          subdomain: slug || undefined,
+          plan_id: form.plan_id || undefined,
+        },
+      });
+      if (error) {
+        toast({ title: "Error", description: error.message || "Failed to create tenant", variant: "destructive" });
+        return;
+      }
+      const errMsg = data?.error;
+      if (errMsg) {
+        toast({ title: "Error", description: errMsg, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Tenant created", description: "Admin can log in with the email and password you provided." });
+      setShowAdd(false);
+      setForm({ tenant_name: "", owner_name: "", email: "", phone: "", domain: "", plan_id: "", password: "", confirmPassword: "" });
+      setSubdomainStatus("idle");
+      fetchAll();
+      return;
+    }
+
+    const domainVal = slug || form.domain.trim() || form.tenant_name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const planId = form.plan_id || plans[0]?.id || null;
+    if (!planId) {
+      toast({ title: "No plan", description: "Add at least one active plan first, or provide email+password to use default plan.", variant: "destructive" });
+      return;
+    }
+    const tenantData = { tenant_name: form.tenant_name, owner_name: form.owner_name, email: form.email, phone: form.phone, domain: domainVal, plan_id: planId, status: "trial" };
+    const { data: newTenant, error } = await supabase.from("tenants").insert(tenantData).select().single();
     if (error || !newTenant) { toast({ title: "Error", description: error?.message, variant: "destructive" }); return; }
 
-    // Create initial subscription record (trial, 14 days)
     const trialEnd = new Date();
     trialEnd.setDate(trialEnd.getDate() + 14);
     await supabase.from("subscriptions").insert({
       tenant_id: newTenant.id,
-      plan_id: form.plan_id || null,
+      plan_id: planId,
       status: "trial",
       renewal_date: trialEnd.toISOString().split("T")[0],
     });
 
+    if (slug) {
+      await supabase.from("tenant_domains").insert({ tenant_id: newTenant.id, subdomain: slug });
+    }
+
     toast({ title: "Tenant created" });
     setShowAdd(false);
-    setForm({ tenant_name: "", owner_name: "", email: "", phone: "", domain: "", plan_id: "" });
+    setForm({ tenant_name: "", owner_name: "", email: "", phone: "", domain: "", plan_id: "", password: "", confirmPassword: "" });
+    setSubdomainStatus("idle");
     fetchAll();
   };
 
@@ -248,10 +355,40 @@ const SaasAdminTenants = () => {
             <div><Label>Business Name *</Label><Input value={form.tenant_name} onChange={e => setForm({ ...form, tenant_name: e.target.value })} className="mt-1" /></div>
             <div><Label>Owner Name</Label><Input value={form.owner_name} onChange={e => setForm({ ...form, owner_name: e.target.value })} className="mt-1" /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Email</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="mt-1" /></div>
+              <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="admin@resort.com" className="mt-1" /></div>
               <div><Label>Phone</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="mt-1" /></div>
             </div>
-            <div><Label>Domain</Label><Input value={form.domain} onChange={e => setForm({ ...form, domain: e.target.value })} className="mt-1" placeholder="booking.resort.com" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Password</Label><Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Min 6 characters" className="mt-1" autoComplete="new-password" /></div>
+              <div><Label>Confirm Password</Label><Input type="password" value={form.confirmPassword} onChange={e => setForm({ ...form, confirmPassword: e.target.value })} placeholder="Repeat password" className="mt-1" autoComplete="new-password" /></div>
+            </div>
+            {(form.email || form.password) && (
+              <p className="text-xs text-muted-foreground">When both Email and Password are provided, a tenant admin account is created so they can log in immediately.</p>
+            )}
+            <div>
+              <Label>Subdomain</Label>
+              <div className="mt-1 flex flex-col gap-1.5">
+                <div className="flex gap-2">
+                  <Input
+                    value={form.domain}
+                    onChange={e => {
+                      const v = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+                      setForm({ ...form, domain: v });
+                    }}
+                    placeholder="greenleaf"
+                    className="flex-1"
+                  />
+                  {subdomainStatus === "checking" && <div className="flex items-center text-muted-foreground text-sm shrink-0">Checking…</div>}
+                  {subdomainStatus === "available" && <div className="flex items-center text-emerald-600 text-sm shrink-0"><Check className="w-4 h-4 mr-1" /> Available</div>}
+                  {subdomainStatus === "taken" && <div className="flex items-center text-destructive text-sm shrink-0"><X className="w-4 h-4 mr-1" /> Taken</div>}
+                </div>
+                {form.domain && (
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {slugifySubdomain(form.domain) || form.domain}{subdomainSuffix}
+                  </p>
+                )}
+              </div>
+            </div>
             <div>
               <Label>Plan</Label>
               <Select value={form.plan_id} onValueChange={v => setForm({ ...form, plan_id: v })}>
@@ -261,7 +398,15 @@ const SaasAdminTenants = () => {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button onClick={addTenant}>Add Tenant</Button>
+              <Button
+                onClick={addTenant}
+                disabled={
+                  !form.tenant_name ||
+                  (slugifySubdomain(form.domain).length >= 2 && (subdomainStatus === "checking" || subdomainStatus === "taken"))
+                }
+              >
+                Add Tenant
+              </Button>
             </div>
           </div>
         </DialogContent>
