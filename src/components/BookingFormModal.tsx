@@ -385,6 +385,7 @@ const BookingFormModal = ({ open, onOpenChange, stayName, stayId, roomCategories
       p_booking_id: newBookingId,
       p_guest_name: name,
       p_phone: fullPhone,
+      p_phone_country_code: phoneCountryCode,
       p_email: email || "",
       p_stay_id: stayId,
       p_checkin: firstRange ? format(firstRange.checkIn, "yyyy-MM-dd") : null,

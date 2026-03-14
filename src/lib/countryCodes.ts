@@ -43,3 +43,30 @@ export function getCountryByCode(code: string): CountryCode | undefined {
 export function getMinDigitsForCountry(code: string): number {
   return getCountryByCode(code)?.minDigits ?? 8;
 }
+
+/**
+ * Normalize phone for WhatsApp wa.me URL.
+ * @param phone - Full phone or local digits
+ * @param countryCode - Optional dial code (e.g. "91", "971"). When provided, ensures correct prefix: India=91, UAE=971, etc.
+ */
+export function formatPhoneForWhatsApp(phone: string, countryCode?: string | null): string {
+  const cleaned = (phone || "").replace(/\D/g, "").trim();
+  if (!cleaned) return "";
+
+  // When country code is provided: use it + local number (avoid double prefix)
+  if (countryCode) {
+    const code = countryCode.replace(/\D/g, "");
+    if (!code) return cleaned;
+    if (cleaned.startsWith(code)) return cleaned;
+    // Prepend country code (local number may have leading 0)
+    const local = cleaned.startsWith("0") ? cleaned.slice(1) : cleaned;
+    return code + local;
+  }
+
+  // Fallback when no country code: infer from number length
+  if (cleaned.length > 10) return cleaned;
+  if (cleaned.length === 10 && !cleaned.startsWith("0")) return `91${cleaned}`;
+  if (cleaned.startsWith("91")) return cleaned;
+  return cleaned;
+}
+

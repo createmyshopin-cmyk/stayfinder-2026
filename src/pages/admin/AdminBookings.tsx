@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { format, differenceInDays, isToday, isTomorrow, isPast, parseISO, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatPhoneForWhatsApp } from "@/lib/countryCodes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,9 +87,8 @@ function exportBookingsCSV(bookings: any[], stays: StayMap) {
   URL.revokeObjectURL(url);
 }
 
-function whatsappUrl(phone: string, guestName: string, bookingId: string) {
-  const cleaned = phone.replace(/\D/g, "");
-  const num = cleaned.startsWith("91") ? cleaned : `91${cleaned}`;
+function whatsappUrl(phone: string, guestName: string, bookingId: string, countryCode?: string) {
+  const num = formatPhoneForWhatsApp(phone, countryCode);
   const text = encodeURIComponent(`Hi ${guestName}, regarding your booking ${bookingId} — `);
   return `https://wa.me/${num}?text=${text}`;
 }
@@ -628,7 +628,7 @@ export default function AdminBookings() {
                 {/* Quick actions row */}
                 <div className="flex items-center gap-1.5">
                   <a
-                    href={whatsappUrl(b.phone, b.guest_name, b.booking_id)}
+                    href={whatsappUrl(b.phone, b.guest_name, b.booking_id, b.phone_country_code)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 h-8 rounded-lg bg-green-500/10 flex items-center justify-center gap-1.5 hover:bg-green-500/20 active:scale-95 transition-all"

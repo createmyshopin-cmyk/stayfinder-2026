@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatPhoneForWhatsApp } from "@/lib/countryCodes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ interface GuestContact {
   name: string;
   email: string;
   phone: string;
+  phone_country_code?: string;
   totalBookings: number;
   totalSpend: number;
   bookedStays: string[];
@@ -65,13 +67,8 @@ type SortKey = "totalBookings" | "totalSpend" | "name" | "lastBookingDate";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-function normalizePhone(phone: string): string {
-  const cleaned = phone.replace(/\D/g, "").trim();
-  return cleaned.startsWith("91") ? cleaned : cleaned ? `91${cleaned}` : "";
-}
-
-function whatsappUrl(phone: string, text: string): string {
-  const num = normalizePhone(phone);
+function whatsappUrl(phone: string, text: string, countryCode?: string): string {
+  const num = formatPhoneForWhatsApp(phone, countryCode);
   if (!num) return "#";
   return `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
 }
@@ -202,6 +199,7 @@ export default function AdminGuestContacts() {
           name: b.guest_name || "Unknown",
           email: email || "",
           phone: phone || "",
+          phone_country_code: b.phone_country_code || "91",
           totalBookings: 0,
           totalSpend: 0,
           bookedStays: [],
@@ -211,6 +209,11 @@ export default function AdminGuestContacts() {
       }
 
       const g = map.get(key)!;
+      const date = b.checkin || b.created_at;
+      if (date && (!g.lastBookingDate || date > g.lastBookingDate)) {
+        g.lastBookingDate = date;
+        g.phone_country_code = b.phone_country_code || g.phone_country_code || "91";
+      }
       if (b.status === "confirmed") {
         g.totalBookings += 1;
         g.totalSpend += b.total_price || 0;
@@ -218,12 +221,6 @@ export default function AdminGuestContacts() {
       if (b.stay_id && stays[b.stay_id]) {
         const stayName = stays[b.stay_id].name;
         if (!g.bookedStays.includes(stayName)) g.bookedStays.push(stayName);
-      }
-      const date = b.checkin || b.created_at;
-      if (date) {
-        if (!g.lastBookingDate || date > g.lastBookingDate) {
-          g.lastBookingDate = date;
-        }
       }
     }
 
@@ -468,7 +465,7 @@ export default function AdminGuestContacts() {
                     )}
                     {g.phone && (
                       <a
-                        href={whatsappUrl(g.phone, `Hi ${g.name}, `)}
+                        href={whatsappUrl(g.phone, `Hi ${g.name}, `, g.phone_country_code)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1.5 text-xs text-green-600 hover:underline truncate"
@@ -508,7 +505,7 @@ export default function AdminGuestContacts() {
 
                 <div className="border-t bg-muted/20 px-2.5 py-2 flex gap-1.5">
                   <a
-                    href={whatsappUrl(g.phone, `Hi ${g.name}, `)}
+                    href={whatsappUrl(g.phone, `Hi ${g.name}, `, g.phone_country_code)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 h-8 rounded-lg bg-green-500/10 flex items-center justify-center gap-1.5 hover:bg-green-500/20"
@@ -619,7 +616,7 @@ function GiveDiscountDialog({ guest, onClose, onSuccess, tenantId, toast }: Give
         ? `${value}% off`
         : `₹${value.toLocaleString("en-IN")} off`;
     const message = `Hi ${guest.name}! Thank you for being a valued guest. Use coupon ${code.trim().toUpperCase()} for ${discountText} on your next stay!`;
-    const waUrl = whatsappUrl(guest.phone, message);
+    const waUrl = whatsappUrl(guest.phone, message, guest.phone_country_code);
 
     await navigator.clipboard.writeText(message);
     onSuccess();

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { format, differenceInDays, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatPhoneForWhatsApp } from "@/lib/countryCodes";
 
 interface BookingDetailDialogProps {
   open: boolean;
@@ -32,9 +33,8 @@ function formatDate(d: string | null): string {
   return format(parseISO(d), "EEE, dd MMM yyyy");
 }
 
-function whatsappUrl(phone: string, guestName: string, bookingId: string) {
-  const cleaned = phone?.replace(/\D/g, "") || "";
-  const num = cleaned.startsWith("91") ? cleaned : `91${cleaned}`;
+function whatsappUrl(phone: string, guestName: string, bookingId: string, countryCode?: string) {
+  const num = formatPhoneForWhatsApp(phone || "", countryCode);
   const text = encodeURIComponent(`Hi ${guestName}, regarding your booking ${bookingId} — `);
   return `https://wa.me/${num}?text=${text}`;
 }
@@ -131,7 +131,7 @@ export function BookingDetailDialog({ open, onOpenChange, booking, stayInfo, onS
               </div>
               <div className="flex gap-1">
                 <Button variant="outline" size="icon" className="h-8 w-8" asChild>
-                  <a href={whatsappUrl(booking.phone, booking.guest_name, booking.booking_id)} target="_blank" rel="noopener noreferrer" title="WhatsApp">
+                  <a href={whatsappUrl(booking.phone, booking.guest_name, booking.booking_id, booking.phone_country_code)} target="_blank" rel="noopener noreferrer" title="WhatsApp">
                     <MessageCircle className="w-4 h-4 text-green-600" />
                   </a>
                 </Button>
