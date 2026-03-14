@@ -4,7 +4,7 @@ import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { SubscriptionBanner } from "./SubscriptionBanner";
 import { NewBookingPopup } from "./NewBookingPopup";
 import { useBookingNotification } from "@/hooks/useBookingNotification";
-import { Outlet } from "react-router-dom";
+import { Outlet, Navigate } from "react-router-dom";
 
 function BookingNotificationListener() {
   const { newBooking, clearNewBooking } = useBookingNotification();
@@ -26,7 +26,7 @@ export function AdminLayout() {
     );
   }
 
-  if (!isAdmin) return null;
+  if (!isAdmin) return <Navigate to="/admin/login" replace />;
 
   return (
     <SidebarProvider>
