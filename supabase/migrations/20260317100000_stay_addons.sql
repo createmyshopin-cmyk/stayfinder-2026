@@ -12,9 +12,13 @@ CREATE TABLE IF NOT EXISTS public.stay_addons (
 ALTER TABLE public.stay_addons ENABLE ROW LEVEL SECURITY;
 
 -- Public can read add-ons (shown in booking form)
-CREATE POLICY "Public read stay_addons"
-  ON public.stay_addons FOR SELECT USING (true);
+DO $$ BEGIN
+  CREATE POLICY "Public read stay_addons"
+    ON public.stay_addons FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Authenticated users (admins) can manage add-ons
-CREATE POLICY "Auth manage stay_addons"
-  ON public.stay_addons FOR ALL USING (auth.role() = 'authenticated');
+DO $$ BEGIN
+  CREATE POLICY "Auth manage stay_addons"
+    ON public.stay_addons FOR ALL USING (auth.role() = 'authenticated');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
