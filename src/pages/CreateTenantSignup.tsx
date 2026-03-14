@@ -19,6 +19,7 @@ const subdomainFromEmail = (email: string) => {
 
 const CreateTenantSignup = () => {
   const [loading, setLoading] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const [subdomainSuffix, setSubdomainSuffix] = useState(".travelvoo.in");
   const [subdomainStatus, setSubdomainStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const checkingRef = useRef<string | null>(null);
@@ -32,6 +33,30 @@ const CreateTenantSignup = () => {
     confirmPassword: "",
     whatsappNumber: "",
   });
+
+  // Block tenant admins from /create-account; only public (unauthenticated) or SaaS admin can create
+  useEffect(() => {
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setAuthChecking(false);
+        return; // Public signup allowed
+      }
+      const { data: isSuperAdmin } = await supabase.rpc("has_role", { _user_id: session.user.id, _role: "super_admin" });
+      if (isSuperAdmin) {
+        setAuthChecking(false);
+        return; // SaaS admin allowed
+      }
+      const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: session.user.id, _role: "admin" });
+      if (isAdmin) {
+        toast({ title: "Not allowed", description: "Tenant accounts cannot create new accounts. Contact your SaaS administrator.", variant: "destructive" });
+        navigate("/admin/dashboard", { replace: true });
+        return;
+      }
+      setAuthChecking(false);
+    };
+    check();
+  }, [navigate]);
 
   useEffect(() => {
     supabase
@@ -135,6 +160,14 @@ const CreateTenantSignup = () => {
       setLoading(false);
     }
   };
+
+  if (authChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/10">
+        <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/10 p-4">

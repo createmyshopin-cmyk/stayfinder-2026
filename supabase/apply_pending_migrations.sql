@@ -79,3 +79,8 @@ CREATE UNIQUE INDEX idx_tenant_domains_subdomain_lower
 DROP INDEX IF EXISTS public.idx_tenant_domains_custom;
 CREATE UNIQUE INDEX idx_tenant_domains_custom_lower
   ON public.tenant_domains (LOWER(custom_domain)) WHERE custom_domain != '';
+
+-- ========== 20260325000000: Auto-verify new signup setting ==========
+INSERT INTO public.saas_platform_settings (setting_key, setting_value)
+VALUES ('signup_auto_verify', 'false')
+ON CONFLICT (setting_key) DO NOTHING;

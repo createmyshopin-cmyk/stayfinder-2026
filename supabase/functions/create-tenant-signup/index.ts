@@ -130,7 +130,22 @@ serve(async (req) => {
       );
     }
 
-    await admin.from("tenant_domains").insert({ tenant_id: tenant.id, subdomain: slug });
+    const { data: autoVerifySetting } = await admin
+      .from("saas_platform_settings")
+      .select("setting_value")
+      .eq("setting_key", "signup_auto_verify")
+      .maybeSingle();
+    const autoVerify = autoVerifySetting?.setting_value === "true";
+
+    const domainPayload: { tenant_id: string; subdomain: string; verified?: boolean; ssl_status?: string } = {
+      tenant_id: tenant.id,
+      subdomain: slug,
+    };
+    if (autoVerify) {
+      domainPayload.verified = true;
+      domainPayload.ssl_status = "active";
+    }
+    await admin.from("tenant_domains").insert(domainPayload);
 
     const renewal = new Date();
     renewal.setDate(renewal.getDate() + 3);

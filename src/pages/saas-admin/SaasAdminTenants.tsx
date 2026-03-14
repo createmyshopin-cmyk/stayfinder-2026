@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { RefreshCw, Plus, Eye, Building2, CreditCard, RotateCcw, ShieldOff, CalendarPlus, Globe, Zap, Check, X, Lock, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { RefreshCw, Plus, Eye, Building2, CreditCard, RotateCcw, ShieldOff, CalendarPlus, Globe, Zap, Check, X, Lock, Trash2, ShieldCheck } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { initiateRazorpayCheckout } from "@/lib/razorpay";
 import { format } from "date-fns";
@@ -43,9 +44,17 @@ const SaasAdminTenants = () => {
   const [form, setForm] = useState({ tenant_name: "", owner_name: "", email: "", phone: "", domain: "", plan_id: "", password: "", confirmPassword: "" });
   const [subdomainSuffix, setSubdomainSuffix] = useState(".travelvoo.in");
   const [subdomainStatus, setSubdomainStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [autoVerifyNewSignup, setAutoVerifyNewSignup] = useState(false);
+  const [autoVerifySaving, setAutoVerifySaving] = useState(false);
   const checkingSlugRef = useRef<string | null>(null);
 
   useEffect(() => { fetchAll(); }, []);
+
+  useEffect(() => {
+    supabase.from("saas_platform_settings").select("setting_value").eq("setting_key", "signup_auto_verify").maybeSingle().then(({ data }) => {
+      setAutoVerifyNewSignup(data?.setting_value === "true");
+    });
+  }, []);
 
   // Reset form and subdomain state when Add dialog closes
   useEffect(() => {
@@ -104,6 +113,23 @@ const SaasAdminTenants = () => {
   const getUsage = (id: string) => usages.find(u => u.tenant_id === id);
   // Latest subscription per tenant
   const getSub = (tenantId: string) => subscriptions.find(s => s.tenant_id === tenantId);
+
+  const setAutoVerify = async (enabled: boolean) => {
+    setAutoVerifySaving(true);
+    try {
+      const { data: existing } = await supabase.from("saas_platform_settings").select("id").eq("setting_key", "signup_auto_verify").maybeSingle();
+      if (existing) {
+        await supabase.from("saas_platform_settings").update({ setting_value: String(enabled) } as any).eq("setting_key", "signup_auto_verify");
+      } else {
+        await supabase.from("saas_platform_settings").insert({ setting_key: "signup_auto_verify", setting_value: String(enabled) } as any);
+      }
+      setAutoVerifyNewSignup(enabled);
+      toast({ title: enabled ? "Auto-verify on" : "Auto-verify off", description: enabled ? "New signups will have subdomain verified instantly" : "New signups require manual verification" });
+    } catch (e: any) {
+      toast({ title: "Failed to update", description: e?.message, variant: "destructive" });
+    }
+    setAutoVerifySaving(false);
+  };
 
   const addTenant = async () => {
     if (!form.tenant_name) return;
@@ -308,7 +334,21 @@ const SaasAdminTenants = () => {
           <h1 className="text-2xl font-bold flex items-center gap-2"><Building2 className="w-6 h-6 text-primary" /> Tenants</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage all platform tenants · {filtered.length} total</p>
         </div>
-        <Button onClick={() => setShowAdd(true)}><Plus className="w-4 h-4 mr-1" /> Add Tenant</Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="auto-verify"
+              checked={autoVerifyNewSignup}
+              disabled={autoVerifySaving}
+              onCheckedChange={(v) => setAutoVerify(v)}
+            />
+            <Label htmlFor="auto-verify" className="text-sm font-normal cursor-pointer flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+              Auto-verify new signups
+            </Label>
+          </div>
+          <Button onClick={() => setShowAdd(true)}><Plus className="w-4 h-4 mr-1" /> Add Tenant</Button>
+        </div>
       </div>
 
       <Input placeholder="Search tenants..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} className="max-w-sm" />
