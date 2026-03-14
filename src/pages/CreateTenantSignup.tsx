@@ -294,7 +294,7 @@ const CreateTenantSignup = () => {
             </Button>
           </form>
           <p className="text-center text-xs text-muted-foreground mt-4">
-            Already have an account? <a href="/admin/login" className="text-primary hover:underline">Sign in</a>
+            Already have an account? <a href="/login" className="text-primary hover:underline">Sign in</a>
           </p>
         </CardContent>
       </Card>
