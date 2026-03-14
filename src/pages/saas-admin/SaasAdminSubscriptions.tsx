@@ -99,7 +99,7 @@ const SaasAdminSubscriptions = () => {
                       <TableCell>{s.billing_cycle}</TableCell>
                       <TableCell>{s.payment_gateway || "—"}</TableCell>
                       <TableCell>
-                        <Select value={s.status} onValueChange={v => updateStatus(s.id, v)}>
+                        <Select value={s.status} onValueChange={v => updateStatus(s.id, s.tenant_id, v)}>
                           <SelectTrigger className="w-[120px] h-8"><Badge variant={statusVariant(s.status)}>{s.status}</Badge></SelectTrigger>
                           <SelectContent>
                             {["trial", "active", "expired", "cancelled"].map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
@@ -113,7 +113,7 @@ const SaasAdminSubscriptions = () => {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
     </div>
   );
 };
