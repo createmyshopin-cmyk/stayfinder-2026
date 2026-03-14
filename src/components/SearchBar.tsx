@@ -121,7 +121,7 @@ const SearchBar = () => {
 
   const handleResultClick = (stay: SearchResult) => {
     setFocused(false);
-    navigate(`/stay/${stay.stay_id}`);
+    navigate(`/stay/${stay.id}`);
   };
 
   const clearSearch = () => {
