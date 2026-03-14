@@ -18,8 +18,10 @@ export function NewBookingPopup({ booking, onClose }: NewBookingPopupProps) {
     navigate("/admin/bookings");
   };
 
+  if (!booking) return null;
+
   return (
-    <Dialog open={!!booking} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
             className="sm:max-w-md"
             onPointerDownOutside={onClose}
