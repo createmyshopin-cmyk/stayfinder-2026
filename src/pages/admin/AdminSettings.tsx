@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Settings, Globe, Phone, Mail, MapPin, RefreshCw, Smartphone, Home, Compass, Sparkles, Heart, Palette, Upload, Image, Type, Loader2 } from "lucide-react";
+import { Settings, Globe, Phone, Mail, MapPin, RefreshCw, Smartphone, Home, Compass, Sparkles, Heart, Palette, Upload, Image, Type, Loader2, Trash2 } from "lucide-react";
 import { clearSiteSettingsCache } from "@/hooks/useSiteSettings";
 
 interface SiteSettings {
@@ -217,9 +217,15 @@ const AdminSettings = () => {
                   {branding.logo_url ? (
                     <div className="space-y-2">
                       <img src={branding.logo_url} alt="Logo" className="max-h-16 mx-auto object-contain" />
-                      <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()}>
-                        Change Logo
-                      </Button>
+                      <div className="flex items-center justify-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()}>
+                          Change Logo
+                        </Button>
+                        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setBranding({ ...branding, logo_url: "" })}>
+                          <Trash2 className="w-4 h-4" />
+                          Remove
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <Button
@@ -243,12 +249,6 @@ const AdminSettings = () => {
                     onChange={(e) => e.target.files?.[0] && uploadFile(e.target.files[0], "logo")}
                   />
                 </div>
-                <Input
-                  value={branding.logo_url}
-                  onChange={(e) => setBranding({ ...branding, logo_url: e.target.value })}
-                  className="mt-2 text-xs"
-                  placeholder="Or paste logo URL"
-                />
               </div>
 
               {/* Favicon Upload */}
@@ -258,9 +258,15 @@ const AdminSettings = () => {
                   {branding.favicon_url ? (
                     <div className="space-y-2">
                       <img src={branding.favicon_url} alt="Favicon" className="max-h-10 mx-auto object-contain" />
-                      <Button variant="outline" size="sm" onClick={() => faviconInputRef.current?.click()}>
-                        Change Favicon
-                      </Button>
+                      <div className="flex items-center justify-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => faviconInputRef.current?.click()}>
+                          Change Favicon
+                        </Button>
+                        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setBranding({ ...branding, favicon_url: "" })}>
+                          <Trash2 className="w-4 h-4" />
+                          Remove
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <Button
@@ -284,12 +290,6 @@ const AdminSettings = () => {
                     onChange={(e) => e.target.files?.[0] && uploadFile(e.target.files[0], "favicon")}
                   />
                 </div>
-                <Input
-                  value={branding.favicon_url}
-                  onChange={(e) => setBranding({ ...branding, favicon_url: e.target.value })}
-                  className="mt-2 text-xs"
-                  placeholder="Or paste favicon URL"
-                />
               </div>
             </div>
 
@@ -297,6 +297,26 @@ const AdminSettings = () => {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label className="flex items-center gap-1 mb-2"><Palette className="w-3 h-3" /> Primary Color</Label>
+                <p className="text-xs text-muted-foreground mb-2">Pick a preset or customize</p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {[
+                    { hex: "#0ea5e9", name: "Ocean" },
+                    { hex: "#059669", name: "Forest" },
+                    { hex: "#f97316", name: "Sunset" },
+                    { hex: "#c2410c", name: "Terracotta" },
+                    { hex: "#0d9488", name: "Teal" },
+                    { hex: "#6366f1", name: "Indigo" },
+                  ].map((preset) => (
+                    <button
+                      key={preset.hex}
+                      type="button"
+                      title={preset.name}
+                      onClick={() => setBranding({ ...branding, primary_color: preset.hex })}
+                      className={`w-9 h-9 rounded-lg border-2 transition-all hover:scale-110 hover:ring-2 hover:ring-ring ${branding.primary_color.toLowerCase() === preset.hex.toLowerCase() ? "border-foreground ring-2 ring-ring" : "border-border"}`}
+                      style={{ backgroundColor: preset.hex }}
+                    />
+                  ))}
+                </div>
                 <div className="flex gap-2 items-center">
                   <input
                     type="color"
