@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
     }
 
     // DNS verification: Check CNAME or A record
-    const platformDomain = "stayfinder.app";
+    const platformDomain = "cname.vercel-dns.com";
     let verified = false;
     let dnsRecords: string[] = [];
 
@@ -115,8 +115,8 @@ Deno.serve(async (req) => {
         if (aData.Answer) {
           for (const record of aData.Answer) {
             dnsRecords.push(`A: ${record.data}`);
-            // Check if pointing to our IP (placeholder — adjust to real IP)
-            if (record.data === "185.158.133.1") {
+            // Check if pointing to Vercel's IP
+            if (record.data === "216.198.79.1") {
               verified = true;
             }
           }
