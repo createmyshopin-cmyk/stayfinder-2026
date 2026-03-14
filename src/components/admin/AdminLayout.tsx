@@ -6,8 +6,20 @@ import { NewBookingPopup } from "./NewBookingPopup";
 import { useBookingNotification } from "@/hooks/useBookingNotification";
 import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
 import { Outlet, Navigate, useNavigate, useLocation } from "react-router-dom";
-import { AlertCircle, ShieldOff, ArrowUpCircle } from "lucide-react";
+import { AlertCircle, ShieldOff, ArrowUpCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+// Route → required feature_flag key
+const FEATURE_ROUTES: Record<string, { key: string; label: string }> = {
+  "/admin/coupons":         { key: "coupons",             label: "Coupons" },
+  "/admin/ai-settings":     { key: "ai_search",           label: "AI Search" },
+  "/admin/quotations":      { key: "quotation_generator", label: "Quotation Generator" },
+  "/admin/invoices":        { key: "invoice_generator",   label: "Invoice Generator" },
+  "/admin/reels-stories":   { key: "reels",               label: "Reels & Stories" },
+  "/admin/analytics":       { key: "analytics",           label: "Analytics" },
+  "/admin/account/domain":  { key: "custom_domain",       label: "Custom Domain" },
+  "/admin/calendar":        { key: "dynamic_pricing",     label: "Dynamic Pricing" },
+};
 
 function BookingNotificationListener() {
   const { newBooking, clearNewBooking } = useBookingNotification();
@@ -23,7 +35,6 @@ function SubscriptionLockOverlay() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Don't lock on the billing page itself
   if (loading || location.pathname.startsWith("/admin/account/billing")) return null;
   if (!isExpired && !isSuspended) return null;
 
@@ -34,41 +45,65 @@ function SubscriptionLockOverlay() {
       <div className="bg-background border rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center space-y-4">
         {isSuspended ? (
           <>
-            <div className="flex justify-center">
-              <ShieldOff className="w-14 h-14 text-destructive" />
-            </div>
+            <div className="flex justify-center"><ShieldOff className="w-14 h-14 text-destructive" /></div>
             <h2 className="text-xl font-bold">Account Suspended</h2>
-            <p className="text-sm text-muted-foreground">
-              Your account has been suspended by the platform administrator. Please contact support.
-            </p>
+            <p className="text-sm text-muted-foreground">Your account has been suspended by the platform administrator. Please contact support.</p>
           </>
         ) : isCancelled ? (
           <>
-            <div className="flex justify-center">
-              <ArrowUpCircle className="w-14 h-14 text-destructive" />
-            </div>
+            <div className="flex justify-center"><ArrowUpCircle className="w-14 h-14 text-destructive" /></div>
             <h2 className="text-xl font-bold">Subscription Cancelled</h2>
-            <p className="text-sm text-muted-foreground">
-              Your subscription has been cancelled. Re-activate your plan to continue using all features.
-            </p>
-            <Button className="w-full" onClick={() => navigate("/admin/account/billing")}>
-              Upgrade Your Plan
-            </Button>
+            <p className="text-sm text-muted-foreground">Your subscription has been cancelled. Re-activate your plan to continue.</p>
+            <Button className="w-full" onClick={() => navigate("/admin/account/billing")}>Upgrade Your Plan</Button>
           </>
         ) : (
           <>
-            <div className="flex justify-center">
-              <AlertCircle className="w-14 h-14 text-destructive" />
-            </div>
+            <div className="flex justify-center"><AlertCircle className="w-14 h-14 text-destructive" /></div>
             <h2 className="text-xl font-bold">Subscription Expired</h2>
-            <p className="text-sm text-muted-foreground">
-              Your subscription has expired. Renew your plan to continue using all features.
-            </p>
-            <Button className="w-full" onClick={() => navigate("/admin/account/billing")}>
-              Upgrade Your Plan
-            </Button>
+            <p className="text-sm text-muted-foreground">Your subscription has expired. Renew your plan to continue using all features.</p>
+            <Button className="w-full" onClick={() => navigate("/admin/account/billing")}>Upgrade Your Plan</Button>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function FeatureLockOverlay() {
+  const { plan, loading, isExpired, isSuspended } = useSubscriptionGuard();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Subscription lock takes priority — don't double-render
+  if (loading || isExpired || isSuspended) return null;
+
+  // Find if this route requires a feature
+  const routeFeature = Object.entries(FEATURE_ROUTES).find(([path]) =>
+    location.pathname.startsWith(path)
+  );
+  if (!routeFeature) return null;
+
+  const [, { key, label }] = routeFeature;
+  const featureFlags: Record<string, boolean> = plan?.feature_flags ?? {};
+  const isEnabled = !!featureFlags[key];
+
+  if (isEnabled) return null;
+
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-background/70">
+      <div className="bg-background border rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 text-center space-y-4">
+        <div className="flex justify-center">
+          <div className="relative">
+            <Lock className="w-14 h-14 text-muted-foreground" />
+          </div>
+        </div>
+        <h2 className="text-xl font-bold">{label} Not Available</h2>
+        <p className="text-sm text-muted-foreground">
+          <span className="font-medium">{label}</span> is not included in your current plan. Upgrade to unlock this feature.
+        </p>
+        <Button className="w-full" onClick={() => navigate("/admin/account/billing")}>
+          Upgrade Your Plan
+        </Button>
       </div>
     </div>
   );
@@ -99,6 +134,7 @@ export function AdminLayout() {
           </header>
           <main className="relative flex-1 p-4 md:p-6 overflow-auto">
             <SubscriptionLockOverlay />
+            <FeatureLockOverlay />
             <SubscriptionBanner />
             <Outlet />
           </main>
