@@ -89,8 +89,8 @@ const StayDetails = () => {
     () =>
       roomCategories.map((r) => ({
         ...r,
-        price: getDbPrice(today, r.id) ?? r.price,
-        originalPrice: getDbOriginalPrice(today, r.id) ?? r.originalPrice,
+        price: getDbPrice(today, r.id) ?? getDbPrice(today) ?? r.price,
+        originalPrice: getDbOriginalPrice(today, r.id) ?? getDbOriginalPrice(today) ?? r.originalPrice,
       })),
     [roomCategories, getDbPrice, getDbOriginalPrice, today]
   );
@@ -561,7 +561,12 @@ const couponDiscount = bestCoupon ? bestCoupon.discount : 0;
                 </>
               ) : (
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-lg font-extrabold text-primary">₹{stay.price.toLocaleString()}</span>
+                  <span className="text-lg font-extrabold text-primary">
+                    ₹{(roomsWithCalendarPrices.length > 0
+                      ? Math.min(...roomsWithCalendarPrices.map((r) => r.price))
+                      : stay.price
+                    ).toLocaleString()}
+                  </span>
                   <span className="text-xs text-muted-foreground">/night</span>
                 </div>
               )}

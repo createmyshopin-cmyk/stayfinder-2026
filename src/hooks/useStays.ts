@@ -65,15 +65,15 @@ function mapDbReview(row: any): Review {
   };
 }
 
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
 export function useStays(category?: string) {
   const cacheKey = category ?? "__all__";
   const [stays, setStays] = useState<Stay[]>(staysCache.get(cacheKey) ?? []);
   const [loading, setLoading] = useState(!staysCache.has(cacheKey));
+  const [calendarPriceMap, setCalendarPriceMap] = useState<Record<string, number>>({});
 
   const fetchStays = useCallback(async () => {
-    const cached = staysCache.get(cacheKey);
-    if (cached) { setStays(cached); setLoading(false); return; }
-
     setLoading(true);
     let query = supabase
       .from("stays")
@@ -94,11 +94,54 @@ export function useStays(category?: string) {
     setLoading(false);
   }, [cacheKey, category]);
 
+  const fetchCalendarMinPrices = useCallback(async (stayIds: string[]) => {
+    if (stayIds.length === 0) return;
+    const dateStr = todayStr();
+    const { data } = await supabase
+      .from("calendar_pricing")
+      .select("stay_id, price")
+      .eq("date", dateStr)
+      .in("stay_id", stayIds)
+      .eq("is_blocked", false)
+      .gte("price", 100)
+      .lte("price", 100000);
+    if (!data || data.length === 0) {
+      setCalendarPriceMap({});
+      return;
+    }
+    const map: Record<string, number> = {};
+    for (const row of data) {
+      const id = row.stay_id;
+      if (!map[id] || row.price < map[id]) map[id] = row.price;
+    }
+    setCalendarPriceMap(map);
+  }, []);
+
   useEffect(() => {
     fetchStays();
   }, [fetchStays]);
 
-  return { stays, loading, refetch: fetchStays };
+  useEffect(() => {
+    if (stays.length === 0) return;
+    fetchCalendarMinPrices(stays.map((s) => s.id));
+  }, [stays, fetchCalendarMinPrices]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("stays-calendar-pricing")
+      .on("postgres_changes", { event: "*", schema: "public", table: "calendar_pricing" }, () => {
+        if (stays.length > 0) fetchCalendarMinPrices(stays.map((s) => s.id));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [stays, fetchCalendarMinPrices]);
+
+  const staysWithCalendarPrices = stays.map((s) => {
+    const calPrice = calendarPriceMap[s.id];
+    return calPrice != null ? { ...s, price: calPrice } : s;
+  });
+
+  return { stays: staysWithCalendarPrices, loading, refetch: fetchStays };
 }
 
 export function useStayDetail(stayId: string | undefined) {
