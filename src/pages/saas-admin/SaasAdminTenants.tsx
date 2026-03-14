@@ -333,10 +333,10 @@ const SaasAdminTenants = () => {
                           </Select>
                         </TableCell>
                         <TableCell className="text-xs">{t.domain || "—"}</TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             <Button size="sm" variant="ghost" onClick={() => setViewTenant(t)} title="View"><Eye className="w-4 h-4" /></Button>
-                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setDeleteTenantId(t.id)} title="Delete"><Trash2 className="w-4 h-4" /></Button>
+                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setDeleteTenantId(t.id)} title="Delete tenant"><Trash2 className="w-4 h-4 shrink-0" /></Button>
                           </div>
                         </TableCell>
                       </TableRow>
