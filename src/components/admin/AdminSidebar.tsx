@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, CalendarCheck, Settings, Tag, Star, LogOut, DoorOpen, FileText, Receipt, User, Globe, BarChart3, CreditCard, ChevronDown, CalendarDays, Clapperboard, BookOpen, ImageIcon, Search } from "lucide-react";
+import { LayoutDashboard, Building2, CalendarCheck, Settings, Tag, Star, LogOut, DoorOpen, FileText, Receipt, User, Globe, BarChart3, CreditCard, ChevronDown, CalendarDays, Clapperboard, BookOpen, ImageIcon, Search, Lock } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useState } from "react";
@@ -9,6 +9,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import { useSubscriptionGuard } from "@/hooks/useSubscriptionGuard";
+
+// feature key required for each route (undefined = always accessible)
+const ROUTE_FEATURE: Record<string, string> = {
+  "/admin/calendar":       "dynamic_pricing",
+  "/admin/analytics":      "analytics",
+  "/admin/coupons":        "coupons",
+  "/admin/quotations":     "quotation_generator",
+  "/admin/invoices":       "invoice_generator",
+  "/admin/accounting":     "invoice_generator",
+  "/admin/reels-stories":  "reels",
+  "/admin/account/domain": "custom_domain",
+  "/admin/ai-settings":    "ai_search",
+};
 
 const staysSubItems = [
   { title: "Stay List", url: "/admin/stays", icon: Building2 },
@@ -46,8 +60,20 @@ interface AdminSidebarProps {
   onSignOut: () => void;
 }
 
+function useFeatureFlags() {
+  const { plan } = useSubscriptionGuard();
+  const flags: Record<string, boolean> = plan?.feature_flags ?? {};
+  const isLocked = (url: string) => {
+    const key = ROUTE_FEATURE[url];
+    if (!key) return false;
+    return !flags[key];
+  };
+  return { isLocked };
+}
+
 function SubMenu({ label, icon: Icon, items, collapsed }: { label: string; icon: any; items: typeof staysSubItems; collapsed: boolean }) {
   const location = useLocation();
+  const { isLocked } = useFeatureFlags();
   const isActive = (path: string) => location.pathname === path;
   const hasActive = items.some((i) => isActive(i.url));
   const [open, setOpen] = useState(hasActive);
@@ -59,7 +85,7 @@ function SubMenu({ label, icon: Icon, items, collapsed }: { label: string; icon:
           <SidebarMenuItem key={item.title}>
             <SidebarMenuButton asChild isActive={isActive(item.url)}>
               <NavLink to={item.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
-                <item.icon className="mr-2 h-4 w-4" />
+                <item.icon className={cn("mr-2 h-4 w-4", isLocked(item.url) && "text-muted-foreground")} />
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -82,16 +108,20 @@ function SubMenu({ label, icon: Icon, items, collapsed }: { label: string; icon:
         </CollapsibleTrigger>
       </SidebarMenuItem>
       <CollapsibleContent>
-        {items.map((item) => (
-          <SidebarMenuItem key={item.title}>
-            <SidebarMenuButton asChild isActive={isActive(item.url)} className="pl-8">
-              <NavLink to={item.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
-                <item.icon className="mr-2 h-4 w-4" />
-                <span>{item.title}</span>
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        ))}
+        {items.map((item) => {
+          const locked = isLocked(item.url);
+          return (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton asChild isActive={isActive(item.url)} className="pl-8">
+                <NavLink to={item.url} end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
+                  <item.icon className={cn("mr-2 h-4 w-4", locked && "text-muted-foreground")} />
+                  <span className={cn("flex-1", locked && "text-muted-foreground")}>{item.title}</span>
+                  {locked && <Lock className="ml-auto h-3 w-3 text-muted-foreground/60" />}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          );
+        })}
       </CollapsibleContent>
     </Collapsible>
   );
@@ -101,6 +131,7 @@ export function AdminSidebar({ onSignOut }: AdminSidebarProps) {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { isLocked } = useFeatureFlags();
   const isActive = (path: string) => location.pathname === path;
 
   return (
@@ -132,8 +163,13 @@ export function AdminSidebar({ onSignOut }: AdminSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={isActive("/admin/analytics")}>
                   <NavLink to="/admin/analytics" end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    {!collapsed && <span>Analytics</span>}
+                    <BarChart3 className={cn("mr-2 h-4 w-4", isLocked("/admin/analytics") && "text-muted-foreground")} />
+                    {!collapsed && (
+                      <>
+                        <span className={cn("flex-1", isLocked("/admin/analytics") && "text-muted-foreground")}>Analytics</span>
+                        {isLocked("/admin/analytics") && <Lock className="ml-auto h-3 w-3 text-muted-foreground/60" />}
+                      </>
+                    )}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -142,8 +178,13 @@ export function AdminSidebar({ onSignOut }: AdminSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={isActive("/admin/coupons")}>
                   <NavLink to="/admin/coupons" end className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
-                    <Tag className="mr-2 h-4 w-4" />
-                    {!collapsed && <span>Coupons</span>}
+                    <Tag className={cn("mr-2 h-4 w-4", isLocked("/admin/coupons") && "text-muted-foreground")} />
+                    {!collapsed && (
+                      <>
+                        <span className={cn("flex-1", isLocked("/admin/coupons") && "text-muted-foreground")}>Coupons</span>
+                        {isLocked("/admin/coupons") && <Lock className="ml-auto h-3 w-3 text-muted-foreground/60" />}
+                      </>
+                    )}
                   </NavLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
