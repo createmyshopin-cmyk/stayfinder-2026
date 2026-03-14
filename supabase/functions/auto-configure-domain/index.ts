@@ -168,11 +168,13 @@ Deno.serve(async (req) => {
     let vercelAdded = false;
     const VERCEL_TOKEN = Deno.env.get("VERCEL_TOKEN");
     const VERCEL_PROJECT_ID = Deno.env.get("VERCEL_PROJECT_ID");
+    const VERCEL_TEAM_ID = Deno.env.get("VERCEL_TEAM_ID");
 
     if (VERCEL_TOKEN && VERCEL_PROJECT_ID && success) {
       try {
+        const teamQuery = VERCEL_TEAM_ID ? `?teamId=${VERCEL_TEAM_ID}` : "";
         const vercelRes = await fetch(
-          `https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/domains`,
+          `https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/domains${teamQuery}`,
           {
             method: "POST",
             headers: {
