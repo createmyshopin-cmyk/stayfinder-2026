@@ -59,7 +59,7 @@ export default function Login() {
       await supabase.auth.signOut();
       toast({
         title: "Access denied",
-        description: "This login is for tenant accounts only. Create an account if you don't have one.",
+        description: "Create an account first below, or ask your platform admin to grant you access.",
         variant: "destructive",
       });
       setLoading(false);
@@ -67,6 +67,45 @@ export default function Login() {
     }
 
     toast({ title: "Welcome back!", description: "Redirecting to dashboard..." });
+
+    // If on platform domain (not tenant subdomain), redirect to tenant's subdomain for better UX
+    const hostname = window.location.hostname;
+    const isPlatformDomain =
+      hostname === "localhost" ||
+      hostname.includes("vercel.app") ||
+      hostname.includes("lovable.app") ||
+      hostname.split(".").length < 3;
+
+    if (isPlatformDomain) {
+      const { data: tenant } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (tenant) {
+        const { data: domain } = await supabase
+          .from("tenant_domains")
+          .select("subdomain")
+          .eq("tenant_id", tenant.id)
+          .not("subdomain", "is", null)
+          .limit(1)
+          .maybeSingle();
+        const { data: suffixRow } = await supabase
+          .from("saas_platform_settings")
+          .select("setting_value")
+          .eq("setting_key", "platform_subdomain_suffix")
+          .maybeSingle();
+        const suffix = suffixRow?.setting_value || ".travelvoo.in";
+        const baseDomain = suffix.replace(/^\./, ""); // .travelvoo.in -> travelvoo.in
+        if (domain?.subdomain && baseDomain) {
+          const tenantUrl = `https://${domain.subdomain}.${baseDomain}/admin/dashboard`;
+          window.location.href = tenantUrl;
+          setLoading(false);
+          return;
+        }
+      }
+    }
+
     navigate("/admin/dashboard", { replace: true });
     setLoading(false);
   };
