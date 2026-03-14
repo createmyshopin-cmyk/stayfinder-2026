@@ -18,13 +18,6 @@ const CategoryTabs = ({ selected, onSelect }: CategoryTabsProps) => {
 
   useEffect(() => {
     fetchCategories();
-    const channel = supabase
-      .channel('homepage_categories')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stay_categories' }, () => {
-        fetchCategories();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
   }, []);
 
   if (categories.length === 0) return null;

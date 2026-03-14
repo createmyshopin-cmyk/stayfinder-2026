@@ -1047,6 +1047,7 @@ export type Database = {
           sticky_menu_enabled: boolean
           sticky_menu_show_ai: boolean
           sticky_menu_show_explore: boolean
+          sticky_menu_show_reels: boolean
           sticky_menu_show_wishlist: boolean
           updated_at: string
           whatsapp_number: string
@@ -1066,6 +1067,7 @@ export type Database = {
           sticky_menu_enabled?: boolean
           sticky_menu_show_ai?: boolean
           sticky_menu_show_explore?: boolean
+          sticky_menu_show_reels?: boolean
           sticky_menu_show_wishlist?: boolean
           updated_at?: string
           whatsapp_number?: string
@@ -1085,6 +1087,7 @@ export type Database = {
           sticky_menu_enabled?: boolean
           sticky_menu_show_ai?: boolean
           sticky_menu_show_explore?: boolean
+          sticky_menu_show_reels?: boolean
           sticky_menu_show_wishlist?: boolean
           updated_at?: string
           whatsapp_number?: string

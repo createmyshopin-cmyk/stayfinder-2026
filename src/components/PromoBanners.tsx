@@ -53,11 +53,6 @@ const PromoBanners = () => {
 
   useEffect(() => {
     fetchBanners();
-    const channel = supabase
-      .channel("promo-banners-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, fetchBanners)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
   }, [fetchBanners]);
 
   const scrollTo = useCallback((index: number) => {
@@ -128,6 +123,7 @@ const PromoBanners = () => {
               <img
                 src={banner.image}
                 alt={banner.title}
+                loading="lazy"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 group-active:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/30 to-transparent" />

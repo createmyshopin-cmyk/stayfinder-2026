@@ -90,6 +90,7 @@ const StayCard = ({ stay, index }: StayCardProps) => {
             key={i}
             src={img}
             alt={stay.name}
+            loading={i === 0 ? "eager" : "lazy"}
             animate={{
               x: `${(i - currentImage) * 100}%`,
             }}

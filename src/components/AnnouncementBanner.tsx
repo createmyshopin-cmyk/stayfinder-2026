@@ -25,11 +25,6 @@ const AnnouncementBanner = () => {
 
   useEffect(() => {
     fetchItems();
-    const channel = supabase
-      .channel("announcement-banners-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, fetchItems)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
   }, [fetchItems]);
 
   const visible = items.filter((i) => !dismissed.has(i.id));

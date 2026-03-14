@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Settings, Globe, Phone, Mail, MapPin, RefreshCw, Smartphone, Home, Compass, Sparkles, Heart, Palette, Upload, Image, Type, Loader2, Trash2 } from "lucide-react";
+import { Settings, Globe, Phone, Mail, MapPin, RefreshCw, Smartphone, Home, Compass, Sparkles, Heart, Palette, Upload, Image, Type, Loader2, Trash2, Clapperboard } from "lucide-react";
 import { clearSiteSettingsCache } from "@/hooks/useSiteSettings";
 
 interface SiteSettings {
@@ -27,6 +27,7 @@ interface SiteSettings {
   sticky_menu_show_ai: boolean;
   sticky_menu_show_wishlist: boolean;
   sticky_menu_show_explore: boolean;
+  sticky_menu_show_reels: boolean;
   ga_id: string;
   fb_pixel_id: string;
   clarity_id: string;
@@ -447,6 +448,13 @@ const AdminSettings = () => {
               </div>
               <Switch checked={settings.sticky_menu_show_wishlist} onCheckedChange={(v) => update("sticky_menu_show_wishlist", v)} />
             </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clapperboard className="w-4 h-4 text-muted-foreground" />
+                <Label>Show Reels</Label>
+              </div>
+              <Switch checked={settings.sticky_menu_show_reels ?? true} onCheckedChange={(v) => update("sticky_menu_show_reels", v)} />
+            </div>
 
             {/* Live Preview */}
             <div className="mt-4 pt-4 border-t border-border">
@@ -476,6 +484,12 @@ const AdminSettings = () => {
                       <div className="flex flex-col items-center">
                         <Heart className="w-5 h-5 text-muted-foreground" />
                         <span className="text-[9px] text-muted-foreground">Wishlist</span>
+                      </div>
+                    )}
+                    {(settings.sticky_menu_show_reels ?? true) && (
+                      <div className="flex flex-col items-center">
+                        <Clapperboard className="w-5 h-5 text-muted-foreground" />
+                        <span className="text-[9px] text-muted-foreground">Reels</span>
                       </div>
                     )}
                   </div>

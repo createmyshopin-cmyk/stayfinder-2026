@@ -17,6 +17,7 @@ import Index from "./pages/Index";
 const StayDetails   = lazy(() => import("./pages/StayDetails"));
 const CategoryPage  = lazy(() => import("./pages/CategoryPage"));
 const Wishlist      = lazy(() => import("./pages/Wishlist"));
+const ReelsPage     = lazy(() => import("./pages/ReelsPage"));
 const NotFound      = lazy(() => import("./pages/NotFound"));
 // ─── Admin pages (heavy — only loaded when the user navigates to /admin) ─────
 const AdminLogin           = lazy(() => import("./pages/admin/AdminLogin"));
@@ -110,6 +111,7 @@ const App = () => (
               <Route path="/stay/:id" element={<MaintenanceGate><StayDetails /></MaintenanceGate>} />
               <Route path="/category/:slug" element={<MaintenanceGate><CategoryPage /></MaintenanceGate>} />
               <Route path="/wishlist" element={<MaintenanceGate><Wishlist /></MaintenanceGate>} />
+              <Route path="/reels" element={<MaintenanceGate><ReelsPage /></MaintenanceGate>} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/admin/create" element={<AdminCreate />} />
               <Route path="/admin" element={<AdminLayout />}>

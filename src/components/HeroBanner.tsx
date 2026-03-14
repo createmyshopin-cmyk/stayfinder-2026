@@ -51,11 +51,6 @@ const HeroBanner = () => {
 
   useEffect(() => {
     fetchSlides();
-    const channel = supabase
-      .channel("hero-banners-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "banners" }, fetchSlides)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
   }, [fetchSlides]);
 
   const next = useCallback(
@@ -97,7 +92,7 @@ const HeroBanner = () => {
             transition={{ duration: 0.4 }}
             className="absolute inset-0"
           >
-            <img src={slide.image} alt={slide.title} className="w-full h-full object-cover" />
+            <img src={slide.image} alt={slide.title} fetchPriority="high" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-foreground/20 to-transparent" />
             <div className="absolute bottom-0 left-0 p-5 md:p-10 lg:p-14 flex flex-col gap-2 md:gap-3">
               <h2 className="text-xl md:text-4xl lg:text-5xl font-bold text-primary-foreground leading-tight">

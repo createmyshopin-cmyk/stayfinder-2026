@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Stay, RoomCategory, Review, Reel, NearbyDestination } from "@/types/stay";
 
+// Module-level cache so switching category tabs doesn't re-fetch already-loaded data
+const staysCache = new Map<string, Stay[]>();
+
 // Fallback images when DB images are empty
 const fallbackImages = [
   "/assets/stay-1.jpg", "/assets/stay-2.jpg", "/assets/stay-3.jpg",
@@ -60,10 +63,14 @@ function mapDbReview(row: any): Review {
 }
 
 export function useStays(category?: string) {
-  const [stays, setStays] = useState<Stay[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = category ?? "__all__";
+  const [stays, setStays] = useState<Stay[]>(staysCache.get(cacheKey) ?? []);
+  const [loading, setLoading] = useState(!staysCache.has(cacheKey));
 
   const fetchStays = useCallback(async () => {
+    const cached = staysCache.get(cacheKey);
+    if (cached) { setStays(cached); setLoading(false); return; }
+
     setLoading(true);
     let query = supabase
       .from("stays")
@@ -76,9 +83,13 @@ export function useStays(category?: string) {
     }
 
     const { data } = await query;
-    if (data) setStays(data.map(mapDbStay));
+    if (data) {
+      const mapped = data.map(mapDbStay);
+      staysCache.set(cacheKey, mapped);
+      setStays(mapped);
+    }
     setLoading(false);
-  }, [category]);
+  }, [cacheKey, category]);
 
   useEffect(() => {
     fetchStays();

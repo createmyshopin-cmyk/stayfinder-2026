@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { COUNTRY_CODES, DEFAULT_COUNTRY_CODE, getMinDigitsForCountry } from "@/lib/countryCodes";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import BookingCalendar, { getDefaultPrice } from "@/components/BookingCalendar";
@@ -72,6 +74,7 @@ const BookingFormModal = ({ open, onOpenChange, stayName, stayId, roomCategories
   const { settings: siteSettings } = useSiteSettings();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState(DEFAULT_COUNTRY_CODE);
   const [email, setEmail] = useState("");
   const [soloTraveller, setSoloTraveller] = useState(false);
   const [groupBooking, setGroupBooking] = useState(false);
@@ -321,7 +324,8 @@ const BookingFormModal = ({ open, onOpenChange, stayName, stayId, roomCategories
     setSubmitError(null);
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = "Name is required.";
-    if (phone.length < 10) errs.phone = "Enter a valid 10-digit number.";
+    const minDigits = getMinDigitsForCountry(phoneCountryCode);
+    if (phone.length < minDigits) errs.phone = `Enter a valid ${minDigits}-digit number.`;
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errs.email = "Enter a valid email.";
     if (selectedRooms.length === 0) errs.rooms = "Select at least one room.";
     if (dateRanges.length === 0) errs.dates = "Select at least one date range.";
@@ -381,10 +385,11 @@ const BookingFormModal = ({ open, onOpenChange, stayName, stayId, roomCategories
     const addonsJson = ADD_ONS.filter((a) => selectedAddOns.includes(a.label)).map((a) => ({ label: a.label, price: a.price }));
     const firstRange = dateRanges[0];
 
+    const fullPhone = phoneCountryCode + phone;
     const { data: rpcData, error } = await supabase.rpc("create_booking_enquiry", {
       p_booking_id: newBookingId,
       p_guest_name: name,
-      p_phone: phone,
+      p_phone: fullPhone,
       p_email: email || "",
       p_stay_id: stayId,
       p_checkin: firstRange ? format(firstRange.checkIn, "yyyy-MM-dd") : null,
@@ -419,7 +424,7 @@ const BookingFormModal = ({ open, onOpenChange, stayName, stayId, roomCategories
         invoice_id: `INV-${Date.now().toString(36).toUpperCase()}`,
         booking_id: insertedBooking.id,
         guest_name: name,
-        phone,
+        phone: fullPhone,
         email: email || "",
         stay_id: stayId,
         checkin: firstRange ? format(firstRange.checkIn, "yyyy-MM-dd") : null,
@@ -472,7 +477,7 @@ const BookingFormModal = ({ open, onOpenChange, stayName, stayId, roomCategories
 ${stayPageUrl}
 
 👤 *Name:* ${name}
-📱 *Phone:* ${phone}
+📱 *Phone:* +${phoneCountryCode} ${phone}
 📧 *Email:* ${email || "Not provided"}
 
 ${guestLine}
@@ -552,13 +557,40 @@ ${addOnLines ? `*Add-ons:*\n${addOnLines}\n` : ""}${appliedCoupon ? `🏷 *Coupo
           {/* WhatsApp */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-foreground">WhatsApp Number</Label>
-            <Input
-              placeholder="Enter WhatsApp number"
-              value={phone}
-              onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "")); setErrors((p) => ({ ...p, phone: "" })); }}
-              inputMode="numeric"
-              className={cn("h-12 rounded-xl bg-muted border-none text-sm", errors.phone && "ring-2 ring-destructive")}
-            />
+            <div className="flex gap-2">
+              <Select value={phoneCountryCode} onValueChange={(v) => { setPhoneCountryCode(v); setErrors((p) => ({ ...p, phone: "" })); }}>
+                <SelectTrigger className={cn("h-12 w-[120px] shrink-0 rounded-xl bg-muted border-none text-sm", errors.phone && "ring-2 ring-destructive")}>
+                  <SelectValue>
+                    {COUNTRY_CODES.find((c) => c.code === phoneCountryCode) ? (
+                      <span className="flex items-center gap-2">
+                        <span>{COUNTRY_CODES.find((c) => c.code === phoneCountryCode)?.flag}</span>
+                        <span>{COUNTRY_CODES.find((c) => c.code === phoneCountryCode)?.dialCode}</span>
+                      </span>
+                    ) : (
+                      "Select"
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRY_CODES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      <span className="flex items-center gap-2">
+                        <span>{c.flag}</span>
+                        <span>{c.dialCode}</span>
+                        <span className="text-muted-foreground">{c.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Enter number"
+                value={phone}
+                onChange={(e) => { setPhone(e.target.value.replace(/\D/g, "")); setErrors((p) => ({ ...p, phone: "" })); }}
+                inputMode="numeric"
+                className={cn("h-12 flex-1 rounded-xl bg-muted border-none text-sm", errors.phone && "ring-2 ring-destructive")}
+              />
+            </div>
             {errors.phone && <p className="text-xs text-destructive font-medium">{errors.phone}</p>}
           </div>
 

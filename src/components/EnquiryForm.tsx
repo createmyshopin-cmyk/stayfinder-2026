@@ -58,6 +58,7 @@ const EnquiryForm = () => {
           <img
             src={enquiryIllustration}
             alt="Travel enquiry"
+            loading="lazy"
             className="h-full object-contain"
           />
         </div>

@@ -11,6 +11,7 @@ import AnnouncementBanner from "@/components/AnnouncementBanner";
 import EnquiryForm from "@/components/EnquiryForm";
 import Footer from "@/components/Footer";
 import StickyBottomNav from "@/components/StickyBottomNav";
+import LazySection from "@/components/LazySection";
 
 const sections = [
   { title: "Couple Friendly Stays", category: "Couple Friendly" },
@@ -40,17 +41,27 @@ const Index = () => {
         <AnnouncementBanner />
         <HeroBanner />
         <SearchBar />
-        <ResortStories />
+        <LazySection rootMargin="300px">
+          <ResortStories />
+        </LazySection>
         <CategoryTabs selected={selectedCategory} onSelect={setSelectedCategory} />
         <StayCarousel title={selectedCategory + " Stays"} category={selectedCategory} />
         {sections
           .filter((s) => s.category !== selectedCategory)
           .map((s) => (
-            <StayCarousel key={s.category} title={s.title} category={s.category} />
+            <LazySection key={s.category} rootMargin="400px">
+              <StayCarousel title={s.title} category={s.category} />
+            </LazySection>
           ))}
-        <PromoBanners />
-        <EnquiryForm />
-        <Footer />
+        <LazySection rootMargin="300px">
+          <PromoBanners />
+        </LazySection>
+        <LazySection rootMargin="200px">
+          <EnquiryForm />
+        </LazySection>
+        <LazySection rootMargin="100px">
+          <Footer />
+        </LazySection>
       </div>
 
       <StickyBottomNav />

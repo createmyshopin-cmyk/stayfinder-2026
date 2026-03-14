@@ -199,7 +199,7 @@ const ResortStories = () => {
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-white/60">
                     {currentGroup.cover && (
-                      <img src={currentGroup.cover} alt="" className="w-full h-full object-cover" />
+                      <img src={currentGroup.cover} alt="" loading="lazy" className="w-full h-full object-cover" />
                     )}
                   </div>
                   <div>
@@ -220,6 +220,7 @@ const ResortStories = () => {
               <img
                 src={currentItem.src}
                 alt={currentItem.title}
+                loading="lazy"
                 className="absolute inset-0 w-full h-full object-cover"
               />
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Compass, Sparkles, Heart, Search, X, Loader2, Mic } from "lucide-react";
+import { Home, Compass, Sparkles, Heart, Search, X, Loader2, Mic, Clapperboard } from "lucide-react";
 import { useWishlist } from "@/context/WishlistContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,7 @@ interface SearchResult {
 
 const StickyBottomNav = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { count } = useWishlist();
   const [activeTab, setActiveTab] = useState("home");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -48,12 +49,22 @@ const StickyBottomNav = () => {
     showAi: true,
     showWishlist: true,
     showExplore: true,
+    showReels: true,
   });
+
+  // Sync activeTab with current route
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === "/") setActiveTab("home");
+    else if (path === "/stays") setActiveTab("explore");
+    else if (path === "/wishlist") setActiveTab("wishlist");
+    else if (path === "/reels") setActiveTab("reels");
+  }, [location.pathname]);
 
   useEffect(() => {
     supabase
       .from("site_settings")
-      .select("sticky_menu_enabled, sticky_menu_show_ai, sticky_menu_show_wishlist, sticky_menu_show_explore")
+      .select("sticky_menu_enabled, sticky_menu_show_ai, sticky_menu_show_wishlist, sticky_menu_show_explore, sticky_menu_show_reels")
       .limit(1)
       .single()
       .then(({ data }) => {
@@ -63,6 +74,7 @@ const StickyBottomNav = () => {
             showAi: data.sticky_menu_show_ai ?? true,
             showWishlist: data.sticky_menu_show_wishlist ?? true,
             showExplore: data.sticky_menu_show_explore ?? true,
+            showReels: data.sticky_menu_show_reels ?? true,
           });
         }
       });
@@ -129,6 +141,8 @@ const StickyBottomNav = () => {
       navigate("/stays");
     } else if (tab === "wishlist") {
       navigate("/wishlist");
+    } else if (tab === "reels") {
+      navigate("/reels");
     }
   };
 
@@ -139,6 +153,7 @@ const StickyBottomNav = () => {
     { key: "explore", icon: Compass, label: "Explore", show: menuConfig.showExplore },
     { key: "ai", icon: Sparkles, label: "AI Search", show: menuConfig.showAi },
     { key: "wishlist", icon: Heart, label: "Wishlist", show: menuConfig.showWishlist },
+    { key: "reels", icon: Clapperboard, label: "Reels", show: menuConfig.showReels },
   ].filter((item) => item.show);
 
   return (

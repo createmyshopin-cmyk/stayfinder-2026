@@ -17,7 +17,7 @@ const Footer = () => {
         <div>
           <div className="flex items-center gap-2 mb-2">
             {logoUrl ? (
-              <img src={logoUrl} alt={siteName} className="h-8 w-auto max-w-[140px] object-contain" />
+              <img src={logoUrl} alt={siteName} loading="lazy" className="h-8 w-auto max-w-[140px] object-contain" />
             ) : (
               <div className="flex items-center gap-1">
                 <span className="text-lg font-extrabold text-primary">{firstPart}</span>
