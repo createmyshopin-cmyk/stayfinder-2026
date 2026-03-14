@@ -19,7 +19,7 @@ import {
 import {
   format, addMonths, subMonths, startOfMonth, endOfMonth,
   startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth,
-  isToday, addWeeks, subWeeks, addDays, subDays, getDay,
+  isToday, isBefore, startOfDay, addWeeks, subWeeks, addDays, subDays, getDay,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -120,6 +120,9 @@ export default function AdminCalendar() {
   const [cooldownMinutes, setCooldownMinutes] = useState(1440);
   const [savingCooldown, setSavingCooldown] = useState(false);
   const [bulkCooldownMinutes, setBulkCooldownMinutes] = useState("");
+
+  // Today reference (start of day, stable)
+  const todayStart = useMemo(() => startOfDay(new Date()), []);
 
   // Drag selection (desktop)
   const isDragging = useRef(false);
@@ -587,6 +590,8 @@ export default function AdminCalendar() {
               const specialDay = getSpecialDay(day);
               const isWE = [0, 6].includes(getDay(day)); // Sat+Sun — matches BookingCalendar
               const isCooldown = isCooldownDate(dateStr);
+              const isPast = isBefore(day, todayStart);
+              const isCurrentDay = isToday(day);
 
               return (
                 <div
@@ -595,13 +600,16 @@ export default function AdminCalendar() {
                     "bg-background p-1 sm:p-1.5 cursor-pointer transition-colors relative group",
                     "min-h-[52px] sm:min-h-[80px]",
                     !inMonth && "opacity-30",
-                    isSelected && "ring-2 ring-primary ring-inset bg-primary/5",
-                    entry?.is_blocked && "bg-destructive/5",
-                    isCooldown && !booking && !entry?.is_blocked && "bg-amber-50 dark:bg-amber-950/20",
-                    booking && !entry?.is_blocked && "bg-accent/30",
-                    isToday(day) && "ring-1 ring-primary/40",
-                    isWE && !isSelected && !booking && !entry?.is_blocked && !isCooldown && "bg-orange-50 dark:bg-orange-950/20",
-                    !isWE && !isSelected && !booking && !entry?.is_blocked && !isCooldown && inMonth && "bg-green-50 dark:bg-green-950/20",
+                    // Past dates — faded, no colour
+                    isPast && inMonth && "opacity-25 bg-muted/40 pointer-events-none",
+                    // Today — distinct highlight
+                    isCurrentDay && "bg-primary/10 ring-2 ring-primary/60 ring-inset",
+                    isSelected && !isPast && "ring-2 ring-primary ring-inset bg-primary/5",
+                    entry?.is_blocked && !isPast && "bg-destructive/5",
+                    isCooldown && !booking && !entry?.is_blocked && !isPast && "bg-amber-50 dark:bg-amber-950/20",
+                    booking && !entry?.is_blocked && !isPast && "bg-accent/30",
+                    isWE && !isSelected && !booking && !entry?.is_blocked && !isCooldown && !isPast && !isCurrentDay && "bg-orange-50 dark:bg-orange-950/20",
+                    !isWE && !isSelected && !booking && !entry?.is_blocked && !isCooldown && !isPast && !isCurrentDay && inMonth && "bg-green-50 dark:bg-green-950/20",
                   )}
                   onMouseDown={() => handleDateMouseDown(dateStr)}
                   onMouseEnter={() => handleDateMouseEnter(dateStr)}
@@ -611,7 +619,7 @@ export default function AdminCalendar() {
                   <div className="flex items-center justify-between">
                     <span className={cn(
                       "text-[10px] sm:text-xs font-medium leading-none",
-                      isToday(day) && "text-primary font-bold",
+                      isCurrentDay && "text-primary font-bold",
                       !inMonth && "text-muted-foreground",
                     )}>
                       {format(day, "d")}
