@@ -19,13 +19,15 @@ function BookingNotificationListener() {
 }
 
 function SubscriptionLockOverlay() {
-  const { isExpired, isSuspended, loading } = useSubscriptionGuard();
+  const { isExpired, isSuspended, status, loading } = useSubscriptionGuard();
   const navigate = useNavigate();
   const location = useLocation();
 
   // Don't lock on the billing page itself
   if (loading || location.pathname.startsWith("/admin/account/billing")) return null;
   if (!isExpired && !isSuspended) return null;
+
+  const isCancelled = status === "cancelled";
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-background/60">
@@ -37,6 +39,17 @@ function SubscriptionLockOverlay() {
             </div>
             <h2 className="text-xl font-bold">Account Suspended</h2>
             <p className="text-sm text-muted-foreground">Your account has been suspended by the platform administrator. Please contact support.</p>
+          </>
+        ) : isCancelled ? (
+          <>
+            <div className="flex justify-center">
+              <AlertCircle className="w-12 h-12 text-destructive" />
+            </div>
+            <h2 className="text-xl font-bold">Subscription Cancelled</h2>
+            <p className="text-sm text-muted-foreground">Your subscription has been cancelled. Re-activate your plan to continue using all features.</p>
+            <Button className="w-full" onClick={() => navigate("/admin/account/billing")}>
+              Re-activate Your Plan
+            </Button>
           </>
         ) : (
           <>
