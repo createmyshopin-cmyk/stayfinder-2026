@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ChevronLeft, ChevronRight, Copy, Calendar as CalendarIcon, Pencil,
   RefreshCw, IndianRupee, Ban, TrendingUp, CalendarDays, RotateCcw,
-  Sunrise, Moon, Sparkles, Timer, Shield,
+  Sunrise, Moon, Sparkles, Timer, Shield, CalendarCheck,
 } from "lucide-react";
 import {
   format, addMonths, subMonths, startOfMonth, endOfMonth,
@@ -121,6 +121,11 @@ export default function AdminCalendar() {
   const [savingCooldown, setSavingCooldown] = useState(false);
   const [bulkCooldownMinutes, setBulkCooldownMinutes] = useState("");
 
+  // Google Calendar sync
+  const [gcalEnabled, setGcalEnabled] = useState(false);
+  const [gcalWebhookUrl, setGcalWebhookUrl] = useState("");
+  const [gcalSyncing, setGcalSyncing] = useState(false);
+
   // Today reference (start of day, stable)
   const todayStart = useMemo(() => startOfDay(new Date()), []);
 
@@ -128,11 +133,17 @@ export default function AdminCalendar() {
   const isDragging = useRef(false);
   const dragStart = useRef<string | null>(null);
 
-  // Fetch stays + tenant id on mount
+  // Fetch stays + tenant id + gcal settings on mount
   useEffect(() => {
     supabase.rpc("get_my_tenant_id").then(({ data }) => setTenantId(data ?? null));
     supabase.from("stays").select("id, name").then(({ data }) => {
       if (data?.length) { setStays(data); if (!selectedStay) setSelectedStay(data[0].id); }
+    });
+    supabase.from("site_settings").select("gcal_enabled, gcal_webhook_url").limit(1).single().then(({ data }) => {
+      if (data) {
+        setGcalEnabled((data as any).gcal_enabled ?? false);
+        setGcalWebhookUrl((data as any).gcal_webhook_url ?? "");
+      }
     });
   }, []);
 
@@ -162,6 +173,34 @@ export default function AdminCalendar() {
     setSavingCooldown(false);
     setCooldownDialogOpen(false);
   };
+
+  // Google Calendar sync
+  const syncToGoogleCalendar = useCallback(async () => {
+    if (!selectedStay || !gcalWebhookUrl) return;
+    setGcalSyncing(true);
+    try {
+      const stayName = stays.find(s => s.id === selectedStay)?.name || "Stay";
+      const { data: allEntries } = await supabase
+        .from("calendar_pricing")
+        .select("date, price, original_price, is_blocked, available, min_nights")
+        .eq("stay_id", selectedStay);
+
+      await fetch(gcalWebhookUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stay_id: selectedStay,
+          stay_name: stayName,
+          entries: allEntries || [],
+        }),
+      });
+      toast({ title: "Sync sent to Google Calendar", description: `${allEntries?.length || 0} dates queued for sync.` });
+    } catch {
+      toast({ title: "Sync failed", description: "Could not reach the Apps Script webhook.", variant: "destructive" });
+    }
+    setGcalSyncing(false);
+  }, [selectedStay, gcalWebhookUrl, stays]);
 
   // Date range
   const dateRange = useMemo(() => {
@@ -466,6 +505,11 @@ export default function AdminCalendar() {
           }}>
             <Copy className="mr-1 h-3 w-3" /> Copy
           </Button>
+          {gcalEnabled && gcalWebhookUrl && (
+            <Button variant="outline" size="sm" className="text-xs h-8 text-blue-600 border-blue-200 hover:bg-blue-50" onClick={syncToGoogleCalendar} disabled={gcalSyncing}>
+              <CalendarCheck className="mr-1 h-3 w-3" /> {gcalSyncing ? "Syncing…" : "Google Cal"}
+            </Button>
+          )}
         </div>
       </div>
 

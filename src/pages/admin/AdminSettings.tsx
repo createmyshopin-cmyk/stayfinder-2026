@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Settings, Globe, Phone, Mail, MapPin, RefreshCw, Smartphone, Home, Compass, Sparkles, Heart, Palette, Upload, Image, Type, Loader2, Trash2, Clapperboard } from "lucide-react";
+import { Settings, Globe, Phone, Mail, MapPin, RefreshCw, Smartphone, Home, Compass, Sparkles, Heart, Palette, Upload, Image, Type, Loader2, Trash2, Clapperboard, CalendarDays } from "lucide-react";
 import { clearSiteSettingsCache } from "@/hooks/useSiteSettings";
 
 interface SiteSettings {
@@ -31,6 +31,9 @@ interface SiteSettings {
   ga_id: string;
   fb_pixel_id: string;
   clarity_id: string;
+  gcal_webhook_url: string;
+  gcal_calendar_id: string;
+  gcal_enabled: boolean;
 }
 
 interface TenantBranding {
@@ -565,6 +568,55 @@ const AdminSettings = () => {
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">Found in Clarity → Settings → Overview</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Google Calendar Integration */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-blue-600" /> Google Calendar Integration
+            </CardTitle>
+            <CardDescription>Sync stay pricing and blocked dates to a Google Calendar via Google Apps Script.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex items-center justify-between">
+              <Label>Enable Google Calendar Sync</Label>
+              <Switch checked={settings.gcal_enabled} onCheckedChange={(v) => update("gcal_enabled", v)} />
+            </div>
+
+            <div>
+              <Label>Google Calendar ID</Label>
+              <Input
+                value={settings.gcal_calendar_id || ""}
+                onChange={(e) => update("gcal_calendar_id", e.target.value)}
+                className="mt-1 font-mono text-sm"
+                placeholder="abc123xyz@group.calendar.google.com"
+                disabled={!settings.gcal_enabled}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">Found in Google Calendar → Settings → Calendar ID</p>
+            </div>
+
+            <div>
+              <Label>Apps Script Webhook URL</Label>
+              <Input
+                value={settings.gcal_webhook_url || ""}
+                onChange={(e) => update("gcal_webhook_url", e.target.value)}
+                className="mt-1 font-mono text-sm"
+                placeholder="https://script.google.com/macros/s/.../exec"
+                disabled={!settings.gcal_enabled}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">Deploy your Apps Script as a web app (anyone access) and paste the URL here</p>
+            </div>
+
+            <div className="rounded-lg bg-muted/60 border border-border p-4 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Setup Guide</p>
+              <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                <li>Copy the Apps Script from <span className="font-mono bg-background px-1 rounded">google-apps-script/calendar-sync.gs</span> in this project</li>
+                <li>In Google Apps Script, set Script Properties: <span className="font-mono bg-background px-1 rounded">CALENDAR_ID</span>, <span className="font-mono bg-background px-1 rounded">SUPABASE_URL</span>, <span className="font-mono bg-background px-1 rounded">SUPABASE_ANON_KEY</span></li>
+                <li>Deploy → New Deployment → Web App → Execute as <em>Me</em> → Who has access: <em>Anyone</em> → Copy the URL above</li>
+              </ol>
             </div>
           </CardContent>
         </Card>
