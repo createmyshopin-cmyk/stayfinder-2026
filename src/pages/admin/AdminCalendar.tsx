@@ -80,6 +80,7 @@ const validatePrice = (raw: string): number | null => {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminCalendar() {
+  const [tenantId, setTenantId] = useState<string | null>(null);
   const [stays, setStays] = useState<Stay[]>([]);
   const [rooms, setRooms] = useState<RoomCategory[]>([]);
   const [selectedStay, setSelectedStay] = useState("");
@@ -124,8 +125,9 @@ export default function AdminCalendar() {
   const isDragging = useRef(false);
   const dragStart = useRef<string | null>(null);
 
-  // Fetch stays
+  // Fetch stays + tenant id on mount
   useEffect(() => {
+    supabase.rpc("get_my_tenant_id").then(({ data }) => setTenantId(data ?? null));
     supabase.from("stays").select("id, name").then(({ data }) => {
       if (data?.length) { setStays(data); if (!selectedStay) setSelectedStay(data[0].id); }
     });
@@ -322,7 +324,7 @@ export default function AdminCalendar() {
       updates.cooldown_minutes = bulkCooldownMinutes !== "" ? parseInt(bulkCooldownMinutes, 10) : null;
 
       if (existing) await supabase.from("calendar_pricing").update(updates).eq("id", existing.id);
-      else { updates.original_price = updates.price || 0; await supabase.from("calendar_pricing").insert(updates); }
+      else { updates.original_price = updates.price || 0; if (tenantId) updates.tenant_id = tenantId; await supabase.from("calendar_pricing").insert(updates); }
     }
 
     toast({ title: "Pricing updated", description: `Updated ${dates.length} date${dates.length > 1 ? "s" : ""}.` });
@@ -369,7 +371,7 @@ export default function AdminCalendar() {
       const existing = getPricingForDate(dateStr);
       const payload: any = { stay_id: selectedStay, date: dateStr, price, room_category_id: roomId };
       if (existing) await supabase.from("calendar_pricing").update(payload).eq("id", existing.id);
-      else { payload.original_price = price; await supabase.from("calendar_pricing").insert(payload); }
+      else { payload.original_price = price; if (tenantId) payload.tenant_id = tenantId; await supabase.from("calendar_pricing").insert(payload); }
     }
 
     toast({ title: "Weekend pricing applied" });
@@ -392,7 +394,7 @@ export default function AdminCalendar() {
       const existing = getPricingForDate(dateStr);
       const payload: any = { stay_id: selectedStay, date: dateStr, price: vp, room_category_id: roomId };
       if (existing) await supabase.from("calendar_pricing").update(payload).eq("id", existing.id);
-      else { payload.original_price = vp; await supabase.from("calendar_pricing").insert(payload); }
+      else { payload.original_price = vp; if (tenantId) payload.tenant_id = tenantId; await supabase.from("calendar_pricing").insert(payload); }
     }
 
     toast({ title: "Seasonal pricing applied", description: `${seasonName || "Season"}: ${days.length} dates updated.` });
@@ -416,6 +418,7 @@ export default function AdminCalendar() {
         min_nights: source.min_nights, is_blocked: source.is_blocked,
         room_category_id: source.room_category_id,
       };
+      if (tenantId) payload.tenant_id = tenantId;
       if (existing) await supabase.from("calendar_pricing").update(payload).eq("id", existing.id);
       else await supabase.from("calendar_pricing").insert(payload);
     }
