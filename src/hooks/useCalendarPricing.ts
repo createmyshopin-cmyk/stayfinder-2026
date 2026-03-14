@@ -166,6 +166,32 @@ export function useCalendarPricing(stayId: string, roomCategoryIds: string[]) {
     [relevantEntries]
   );
 
+  const getOriginalPriceForDate = useCallback(
+    (date: Date, roomCategoryId?: string): number | undefined => {
+      if (roomCategoryId) {
+        const roomEntry = relevantEntries.find(
+          (e) =>
+            isSameDay(new Date(e.date + "T00:00:00"), date) &&
+            !e.is_blocked &&
+            e.room_category_id === roomCategoryId
+        );
+        if (roomEntry && roomEntry.original_price > 0 && roomEntry.original_price !== roomEntry.price) {
+          return roomEntry.original_price;
+        }
+      }
+      const globalEntry = relevantEntries.find(
+        (e) =>
+          isSameDay(new Date(e.date + "T00:00:00"), date) &&
+          !e.is_blocked &&
+          (roomCategoryId ? e.room_category_id === null : true)
+      );
+      return globalEntry && globalEntry.original_price > 0 && globalEntry.original_price !== globalEntry.price
+        ? globalEntry.original_price
+        : undefined;
+    },
+    [relevantEntries]
+  );
+
   const getMinNightsForDate = useCallback(
     (date: Date): number => {
       const entry = relevantEntries.find(
@@ -206,6 +232,7 @@ export function useCalendarPricing(stayId: string, roomCategoryIds: string[]) {
     customPricing,
     unavailableDates,
     getPriceForDate,
+    getOriginalPriceForDate,
     getMinNightsForDate,
     getAvailabilityForDate,
     isBookedDate,

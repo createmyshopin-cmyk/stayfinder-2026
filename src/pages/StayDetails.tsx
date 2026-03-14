@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useRef, useMemo, useEffect } from "react";
+import { startOfDay } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Star, MapPin, ChevronLeft, ChevronRight, Wifi, Waves, UtensilsCrossed, Car, TreePine, Flame, Coffee, Dumbbell, Heart, Share2, Sparkles, Tag, PartyPopper, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ import ConfettiCelebration from "@/components/ConfettiCelebration";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { useStayDetail, useStays } from "@/hooks/useStays";
+import { useCalendarPricing } from "@/hooks/useCalendarPricing";
 import { supabase } from "@/integrations/supabase/client";
 import { useDocumentHead } from "@/hooks/useDocumentHead";
 import { getOgImageUrl } from "@/lib/ogImage";
@@ -78,6 +80,20 @@ const StayDetails = () => {
   // Fetch stay data from database
   const { stay, roomCategories, reviews, reels, nearbyDestinations, loading } = useStayDetail(id);
   const liked = stay ? isWishlisted(stay.id) : false;
+
+  // Real-time calendar pricing — admin changes reflect instantly via Supabase Realtime
+  const allRoomCategoryIds = useMemo(() => roomCategories.map((r) => r.id), [roomCategories]);
+  const { getPriceForDate: getDbPrice, getOriginalPriceForDate: getDbOriginalPrice } = useCalendarPricing(stay?.id ?? "", allRoomCategoryIds);
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const roomsWithCalendarPrices = useMemo(
+    () =>
+      roomCategories.map((r) => ({
+        ...r,
+        price: getDbPrice(today, r.id) ?? r.price,
+        originalPrice: getDbOriginalPrice(today, r.id) ?? r.originalPrice,
+      })),
+    [roomCategories, getDbPrice, getDbOriginalPrice, today]
+  );
 
   const seoTitle = stay?.seoTitle || (stay ? `${stay.name} | ${siteName}` : "");
   const seoDescription = stay?.seoDescription || (stay?.description?.slice(0, 155) ?? "");
@@ -194,10 +210,15 @@ const StayDetails = () => {
   const [roomSelections, setRoomSelections] = useState<RoomSelection[]>([]);
 
   useEffect(() => {
-    if (roomCategories.length > 0) {
-      setRoomSelections(buildSelections(roomCategories));
-    }
-  }, [roomCategories]);
+    if (roomsWithCalendarPrices.length === 0) return;
+    setRoomSelections((prev) => {
+      if (prev.length === 0) return buildSelections(roomsWithCalendarPrices);
+      return prev.map((s, i) => {
+        const room = roomsWithCalendarPrices.find((r) => r.name === s.name) ?? roomsWithCalendarPrices[i];
+        return room ? { ...s, price: room.price, originalPrice: room.originalPrice } : s;
+      });
+    });
+  }, [roomsWithCalendarPrices]);
 
   // Dynamic pricing
   const roomTotal = useMemo(() =>
@@ -415,9 +436,9 @@ const couponDiscount = bestCoupon ? bestCoupon.discount : 0;
         </div>
       </div>
 
-      {/* 6. Room Categories */}
-      {roomCategories.length > 0 && (
-        <RoomCategories rooms={roomCategories} selections={roomSelections} onSelectionsChange={setRoomSelections} />
+      {/* 6. Room Categories — prices from calendar_pricing (real-time) */}
+      {roomsWithCalendarPrices.length > 0 && (
+        <RoomCategories rooms={roomsWithCalendarPrices} selections={roomSelections} onSelectionsChange={setRoomSelections} />
       )}
 
       {/* Coupon tiers progress */}

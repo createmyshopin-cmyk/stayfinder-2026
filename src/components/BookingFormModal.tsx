@@ -172,6 +172,22 @@ const BookingFormModal = ({ open, onOpenChange, stayName, stayId, roomCategories
   const allRoomCategoryIds = useMemo(() => roomCategories.map((r) => r.id), [roomCategories]);
   const { customPricing, unavailableDates: dbUnavailableDates, getPriceForDate: getDbPrice, getMinNightsForDate, isBookedDate, isCooldownDate, cooldownMinutes, lastFetchedAt } = useCalendarPricing(stayId, allRoomCategoryIds);
 
+  // Resolve display price per room: use calendar price when dates selected, else fallback to room_categories
+  const getDisplayPriceForRoom = useCallback(
+    (room: RoomSelection, roomCategoryId?: string): { price: number; originalPrice: number } => {
+      const firstDate = dateRanges[0]?.checkIn;
+      if (firstDate && roomCategoryId) {
+        const calPrice = getDbPrice(firstDate, roomCategoryId);
+        if (calPrice != null) {
+          const originalPrice = room.originalPrice;
+          return { price: calPrice, originalPrice: originalPrice > calPrice ? originalPrice : calPrice };
+        }
+      }
+      return { price: room.price, originalPrice: room.originalPrice };
+    },
+    [dateRanges, getDbPrice]
+  );
+
   const unavailableDates = dbUnavailableDates;
 
   const calendarBasePrice = useMemo(() => {
@@ -791,8 +807,14 @@ ${addOnLines ? `*Add-ons:*\n${addOnLines}\n` : ""}${appliedCoupon ? `🏷 *Coupo
                       />
                       <span className="text-sm font-semibold text-foreground">{room.name}</span>
                     </div>
-                    <span className="text-sm font-bold text-primary">
-                      ₹{room.price.toLocaleString()}
+                    <span className="text-sm font-bold text-primary" aria-live="polite">
+                      ₹{(
+                        dateRanges.length > 0
+                          ? (getDbPrice(dateRanges[0].checkIn, roomCategories.find((rc) => rc.name === room.name)?.id) ??
+                            getDbPrice(dateRanges[0].checkIn) ??
+                            room.price)
+                          : room.price
+                      ).toLocaleString()}
                       <span className="text-xs font-normal text-muted-foreground"> /night</span>
                     </span>
                   </button>
