@@ -19,8 +19,8 @@ export const useTenant = () => useContext(TenantContext);
 
 /**
  * Resolves tenant from:
- * 1. Subdomain (e.g., greenleaf.app.com)
- * 2. Custom domain mapping in tenants table
+ * 1. Custom domain match in tenant_domains table (e.g., tajresort.com)
+ * 2. Subdomain match in tenant_domains table (e.g., taj from taj.easystay.com)
  * 3. Falls back to null (platform-wide / no tenant)
  */
 async function resolveTenant(): Promise<{ id: string; name: string } | null> {
@@ -36,31 +36,34 @@ async function resolveTenant(): Promise<{ id: string; name: string } | null> {
     return null;
   }
 
-  // Try domain match
-  const { data } = await supabase
-    .from("tenants")
-    .select("id, tenant_name")
-    .eq("domain", hostname)
+  // Step 1: Try exact custom domain match in tenant_domains
+  const { data: domainMatch } = await supabase
+    .from("tenant_domains")
+    .select("tenant_id, tenants(id, tenant_name)")
+    .eq("custom_domain", hostname)
+    .eq("verified", true)
     .limit(1)
     .single();
 
-  if (data) {
-    return { id: data.id, name: data.tenant_name };
+  if (domainMatch?.tenant_id) {
+    const tenant = domainMatch.tenants as { id: string; tenant_name: string } | null;
+    return { id: domainMatch.tenant_id, name: tenant?.tenant_name ?? "" };
   }
 
-  // Try subdomain match (e.g., greenleaf from greenleaf.app.com)
+  // Step 2: Try subdomain match (e.g., "taj" from "taj.easystay.com")
   const parts = hostname.split(".");
   if (parts.length >= 3) {
     const subdomain = parts[0];
-    const { data: subData } = await supabase
-      .from("tenants")
-      .select("id, tenant_name")
-      .ilike("domain", `%${subdomain}%`)
+    const { data: subMatch } = await supabase
+      .from("tenant_domains")
+      .select("tenant_id, tenants(id, tenant_name)")
+      .eq("subdomain", subdomain)
       .limit(1)
       .single();
 
-    if (subData) {
-      return { id: subData.id, name: subData.tenant_name };
+    if (subMatch?.tenant_id) {
+      const tenant = subMatch.tenants as { id: string; tenant_name: string } | null;
+      return { id: subMatch.tenant_id, name: tenant?.tenant_name ?? "" };
     }
   }
 

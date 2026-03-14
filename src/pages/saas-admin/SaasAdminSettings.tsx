@@ -16,8 +16,8 @@ const SaasAdminSettings = () => {
   const [dnsSaving, setDnsSaving] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [settings, setSettings] = useState({
-    platformName: "StayFinder",
-    supportEmail: "support@stayfinder.app",
+    platformName: "TravelVoo",
+    supportEmail: "support@travelvoo.in",
     defaultTrialDays: 14,
     defaultCurrency: "INR",
     maintenanceMode: false,
@@ -25,7 +25,7 @@ const SaasAdminSettings = () => {
     requireEmailVerification: true,
     maxTenantsAllowed: -1,
     defaultPlanId: "",
-    footerText: "© 2026 StayFinder. All rights reserved.",
+    footerText: "© 2026 TravelVoo. All rights reserved.",
     termsUrl: "",
     privacyUrl: "",
     smtpConfigured: false,
@@ -35,10 +35,10 @@ const SaasAdminSettings = () => {
     domainMethodGodaddy: true,
     domainMethodHostinger: true,
     domainMethodEntri: true,
-    platformBaseDomain: "stayfinder.app",
-    platformCnameTarget: "stayfinder.app",
-    platformARecordIp: "185.158.133.1",
-    platformSubdomainSuffix: ".stayfinder.app",
+    platformBaseDomain: "travelvoo.in",
+    platformCnameTarget: "cname.vercel-dns.com",
+    platformARecordIp: "216.198.79.1",
+    platformSubdomainSuffix: ".travelvoo.in",
     platformDnsTtl: "600",
   });
   const [plans, setPlans] = useState<any[]>([]);
@@ -71,10 +71,10 @@ const SaasAdminSettings = () => {
         domainMethodGodaddy: map.domain_method_godaddy !== "false",
         domainMethodHostinger: map.domain_method_hostinger !== "false",
         domainMethodEntri: map.domain_method_entri !== "false",
-        platformBaseDomain: map.platform_base_domain || "stayfinder.app",
-        platformCnameTarget: map.platform_cname_target || "stayfinder.app",
-        platformARecordIp: map.platform_a_record_ip || "185.158.133.1",
-        platformSubdomainSuffix: map.platform_subdomain_suffix || ".stayfinder.app",
+        platformBaseDomain: map.platform_base_domain || "travelvoo.in",
+        platformCnameTarget: map.platform_cname_target || "cname.vercel-dns.com",
+        platformARecordIp: map.platform_a_record_ip || "216.198.79.1",
+        platformSubdomainSuffix: map.platform_subdomain_suffix || ".travelvoo.in",
         platformDnsTtl: map.platform_dns_ttl || "600",
       }));
     }
@@ -295,7 +295,7 @@ const SaasAdminSettings = () => {
                   value={settings.platformBaseDomain}
                   onChange={(e) => update("platformBaseDomain", e.target.value)}
                   className="font-mono text-xs"
-                  placeholder="stayfinder.app"
+                  placeholder="travelvoo.in"
                 />
                 <Button size="icon" variant="ghost" className="shrink-0" onClick={() => copyValue("baseDomain", settings.platformBaseDomain)}>
                   {copiedKey === "baseDomain" ? <CheckCheck className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
@@ -310,7 +310,7 @@ const SaasAdminSettings = () => {
                   value={settings.platformSubdomainSuffix}
                   onChange={(e) => update("platformSubdomainSuffix", e.target.value)}
                   className="font-mono text-xs"
-                  placeholder=".stayfinder.app"
+                  placeholder=".travelvoo.in"
                 />
                 <Button size="icon" variant="ghost" className="shrink-0" onClick={() => copyValue("suffix", settings.platformSubdomainSuffix)}>
                   {copiedKey === "suffix" ? <CheckCheck className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
@@ -338,7 +338,7 @@ const SaasAdminSettings = () => {
                     value={settings.platformCnameTarget}
                     onChange={(e) => update("platformCnameTarget", e.target.value)}
                     className="font-mono text-xs h-7 px-2"
-                    placeholder="stayfinder.app"
+                    placeholder="cname.vercel-dns.com"
                   />
                 </div>
                 <div>

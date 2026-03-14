@@ -140,6 +140,11 @@ const SaasAdminDomains = () => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
+    // Register custom domain with Vercel project (non-blocking)
+    if (form.custom_domain) {
+      supabase.functions.invoke("add-domain-to-vercel", { body: { domain: form.custom_domain } });
+    }
+
     toast({
       title: "Domain added",
       description: isAutoApproved ? "Auto-approved with SSL active" : undefined,
@@ -388,7 +393,7 @@ const SaasAdminDomains = () => {
               <Label>Subdomain</Label>
               <div className="flex items-center gap-1 mt-1">
                 <Input value={form.subdomain} onChange={e => setForm({ ...form, subdomain: e.target.value })} placeholder="greenleaf" />
-                <span className="text-sm text-muted-foreground whitespace-nowrap">.app.com</span>
+                <span className="text-sm text-muted-foreground whitespace-nowrap">.travelvoo.in</span>
               </div>
             </div>
             <div>

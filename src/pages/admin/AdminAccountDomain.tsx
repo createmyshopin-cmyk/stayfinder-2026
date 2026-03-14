@@ -57,11 +57,11 @@ interface PlatformDns {
 }
 
 const DNS_DEFAULTS: PlatformDns = {
-  cnameTarget: "stayfinder.app",
-  aRecordIp: "185.158.133.1",
-  subdomainSuffix: ".stayfinder.app",
+  cnameTarget: "cname.vercel-dns.com",
+  aRecordIp: "216.198.79.1",
+  subdomainSuffix: ".travelvoo.in",
   dnsTtl: "600",
-  baseDomain: "stayfinder.app",
+  baseDomain: "travelvoo.in",
 };
 
 const AdminAccountDomain = () => {
@@ -188,6 +188,9 @@ const AdminAccountDomain = () => {
       setAdding(false);
       return;
     }
+
+    // Register domain with Vercel project (non-blocking — failure is silent)
+    supabase.functions.invoke("add-domain-to-vercel", { body: { domain: newDomain.trim() } });
 
     toast({ title: "Domain added", description: `Add CNAME record pointing to ${dns.cnameTarget}` });
     resetDialog();

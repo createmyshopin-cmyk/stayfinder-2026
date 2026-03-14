@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       baseDomain = domain;
     }
 
-    const platformDomain = "stayfinder.app";
+    const platformDomain = "cname.vercel-dns.com";
     let success = false;
     let message = "";
 
@@ -164,10 +164,39 @@ Deno.serve(async (req) => {
       }).eq("id", domain_id);
     }
 
+    // Register domain with Vercel project so traffic is routed correctly
+    let vercelAdded = false;
+    const VERCEL_TOKEN = Deno.env.get("VERCEL_TOKEN");
+    const VERCEL_PROJECT_ID = Deno.env.get("VERCEL_PROJECT_ID");
+
+    if (VERCEL_TOKEN && VERCEL_PROJECT_ID && success) {
+      try {
+        const vercelRes = await fetch(
+          `https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/domains`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${VERCEL_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ name: domain }),
+          }
+        );
+        vercelAdded = vercelRes.ok || vercelRes.status === 409; // 409 = already exists, that's fine
+        if (!vercelAdded) {
+          const vercelErr = await vercelRes.text();
+          console.error("Vercel domain add failed:", vercelErr);
+        }
+      } catch (err) {
+        console.error("Vercel API call failed:", err.message);
+      }
+    }
+
     return new Response(JSON.stringify({
       success,
       message,
       auto_configured: success,
+      vercel_domain_added: vercelAdded,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
