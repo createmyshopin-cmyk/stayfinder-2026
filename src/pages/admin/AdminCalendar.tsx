@@ -133,12 +133,17 @@ export default function AdminCalendar() {
   const isDragging = useRef(false);
   const dragStart = useRef<string | null>(null);
 
-  // Fetch stays + tenant id + gcal settings on mount
+  // Fetch stays + tenant id + gcal settings on mount (tenant-scoped: only own stays)
   useEffect(() => {
-    supabase.rpc("get_my_tenant_id").then(({ data }) => setTenantId(data ?? null));
-    supabase.from("stays").select("id, name").then(({ data }) => {
+    const init = async () => {
+      const { data: tid } = await supabase.rpc("get_my_tenant_id");
+      setTenantId(tid ?? null);
+      let staysQuery = supabase.from("stays").select("id, name");
+      if (tid != null) staysQuery = staysQuery.eq("tenant_id", tid);
+      const { data } = await staysQuery;
       if (data?.length) { setStays(data); if (!selectedStay) setSelectedStay(data[0].id); }
-    });
+    };
+    init();
     supabase.from("site_settings").select("gcal_enabled, gcal_webhook_url").limit(1).single().then(({ data }) => {
       if (data) {
         setGcalEnabled((data as any).gcal_enabled ?? false);
