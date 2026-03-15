@@ -37,7 +37,9 @@ export function useUsageLimits(): UsageLimits {
   const [tenantId, setTenantId] = useState<string | null>(null);
 
   const fetch = useCallback(async () => {
-    const { data: tenant } = await supabase.from("tenants").select("id, plan_id").limit(1).single();
+    const { data: myTenantId } = await supabase.rpc("get_my_tenant_id");
+    if (!myTenantId) { setLoading(false); return; }
+    const { data: tenant } = await supabase.from("tenants").select("id, plan_id").eq("id", myTenantId).single();
     if (!tenant) { setLoading(false); return; }
     setTenantId(tenant.id);
 

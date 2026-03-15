@@ -118,7 +118,10 @@ const AdminAccountDomain = () => {
 
   const fetchData = useCallback(async () => {
     setRlsError(false);
-    const { data: t, error: tErr } = await supabase.from("tenants").select("*").limit(1).single();
+    const { data: tenantId } = await supabase.rpc("get_my_tenant_id");
+    const { data: t, error: tErr } = tenantId
+      ? await supabase.from("tenants").select("*").eq("id", tenantId).single()
+      : { data: null, error: null };
     if (tErr) { setLoading(false); return; }
     setTenant(t);
 

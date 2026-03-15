@@ -33,7 +33,9 @@ export function useSubscriptionGuard(): SubscriptionStatus {
   const location = useLocation();
 
   const check = async () => {
-    const { data: tenant } = await supabase.from("tenants").select("*").limit(1).single();
+    const { data: tenantIdFromRpc } = await supabase.rpc("get_my_tenant_id");
+    if (!tenantIdFromRpc) { setState((s) => ({ ...s, loading: false })); return; }
+    const { data: tenant } = await supabase.from("tenants").select("*").eq("id", tenantIdFromRpc).single();
     if (!tenant) { setState((s) => ({ ...s, loading: false })); return; }
 
     setTenantId(tenant.id);

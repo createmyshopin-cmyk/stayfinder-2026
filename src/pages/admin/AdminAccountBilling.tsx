@@ -59,7 +59,8 @@ const AdminAccountBilling = () => {
   useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
-    const { data: t } = await supabase.from("tenants").select("*").limit(1).single();
+    const { data: tenantId } = await supabase.rpc("get_my_tenant_id");
+    const { data: t } = tenantId ? await supabase.from("tenants").select("*").eq("id", tenantId).single() : { data: null };
     setTenant(t);
     if (t) {
       if (t.plan_id) {

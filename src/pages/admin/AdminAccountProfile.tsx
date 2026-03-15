@@ -17,8 +17,8 @@ const AdminAccountProfile = () => {
   }, []);
 
   const fetchTenant = async () => {
-    // For now, get the first tenant the admin manages
-    const { data } = await supabase.from("tenants").select("*").limit(1).single();
+    const { data: tenantId } = await supabase.rpc("get_my_tenant_id");
+    const { data } = tenantId ? await supabase.from("tenants").select("*").eq("id", tenantId).single() : { data: null };
     setTenant(data);
     setLoading(false);
   };

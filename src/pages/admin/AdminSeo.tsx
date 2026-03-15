@@ -39,8 +39,8 @@ const AdminSeo = () => {
   }, []);
 
   const fetchTenantId = async (): Promise<string> => {
-    const { data } = await supabase.from("tenants").select("id").limit(1).single();
-    return data?.id ?? "default";
+    const { data } = await supabase.rpc("get_my_tenant_id");
+    return data ?? "default";
   };
 
   const fetchSettings = async () => {

@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.entri-token]
 verify_jwt = false
+
+[functions.create-tenant-signup]
+verify_jwt = false
+
+[functions.create-tenant-from-oauth]
+verify_jwt = false

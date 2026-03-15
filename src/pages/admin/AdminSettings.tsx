@@ -61,9 +61,10 @@ const AdminSettings = () => {
 
   const fetchSettings = async () => {
     setLoading(true);
+    const { data: tenantId } = await supabase.rpc("get_my_tenant_id");
     const [{ data: settingsData }, { data: tenantData }] = await Promise.all([
       supabase.from("site_settings").select("*").limit(1).single(),
-      supabase.from("tenants").select("*").limit(1).single(),
+      tenantId ? supabase.from("tenants").select("*").eq("id", tenantId).single() : Promise.resolve({ data: null }),
     ]);
     if (settingsData) setSettings(settingsData as SiteSettings);
     if (tenantData) {
