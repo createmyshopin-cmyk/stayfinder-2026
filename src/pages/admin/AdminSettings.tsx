@@ -98,8 +98,10 @@ const AdminSettings = () => {
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingFavicon, setUploadingFavicon] = useState(false);
+  const [uploadingPromoImage, setUploadingPromoImage] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
+  const promoImageInputRef = useRef<HTMLInputElement>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [popupSettings, setPopupSettings] = useState<PopupSettings | null>(null);
   const [features, setFeatures] = useState<FeatureItem[]>([]);
@@ -282,6 +284,29 @@ const AdminSettings = () => {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     }
     setUploading(false);
+  };
+
+  const uploadPromoImage = async (rawFile: File) => {
+    if (!tenant) return;
+    setUploadingPromoImage(true);
+    try {
+      const file = await compressImage(rawFile, "promo");
+      const ext = file.name.split(".").pop();
+      const path = `${tenant.id || "default"}/promo-${Date.now()}.${ext}`;
+
+      const { error: uploadErr } = await supabase.storage.from("branding").upload(path, file, {
+        upsert: true,
+      });
+      if (uploadErr) throw uploadErr;
+
+      const { data: urlData } = supabase.storage.from("branding").getPublicUrl(path);
+      const url = urlData.publicUrl;
+      setPopupSettings((prev) => (prev ? { ...prev, image_url: url } : prev));
+      toast({ title: "Promo image uploaded" });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    }
+    setUploadingPromoImage(false);
   };
 
   const update = (key: keyof SiteSettings, value: string | boolean) => {
@@ -1129,18 +1154,75 @@ const AdminSettings = () => {
                         </div>
                         <div className="grid gap-3 md:grid-cols-2">
                           <div>
-                            <Label>Background Image URL</Label>
-                            <Input
-                              value={popupSettings.image_url}
-                              onChange={(e) =>
-                                setPopupSettings({
-                                  ...popupSettings,
-                                  image_url: e.target.value,
-                                })
-                              }
-                              className="mt-1 text-xs"
-                              placeholder="https://images.unsplash.com/..."
-                            />
+                            <Label className="flex items-center gap-1 mb-1">
+                              <Image className="w-3 h-3" />
+                              Background Image
+                            </Label>
+                            <div className="border rounded-lg p-3 space-y-2">
+                              {popupSettings.image_url ? (
+                                <>
+                                  <div className="h-24 rounded-md overflow-hidden bg-muted flex items-center justify-center">
+                                    <img
+                                      src={popupSettings.image_url}
+                                      alt="Promo"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="xs"
+                                      onClick={() => promoImageInputRef.current?.click()}
+                                    >
+                                      Change Image
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="xs"
+                                      className="text-destructive"
+                                      onClick={() =>
+                                        setPopupSettings({ ...popupSettings, image_url: "" })
+                                      }
+                                    >
+                                      <Trash2 className="w-3 h-3 mr-1" />
+                                      Remove
+                                    </Button>
+                                  </div>
+                                </>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => promoImageInputRef.current?.click()}
+                                  disabled={uploadingPromoImage}
+                                >
+                                  {uploadingPromoImage ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                      Uploading...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="w-4 h-4 mr-1" />
+                                      Add Background Image
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                              <input
+                                ref={promoImageInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) =>
+                                  e.target.files?.[0] && uploadPromoImage(e.target.files[0])
+                                }
+                              />
+                              <p className="text-[11px] text-muted-foreground">
+                                Optional. Use a wide image to create a hero-style promo card.
+                              </p>
+                            </div>
                           </div>
                           <div>
                             <Label>Attach Coupon (optional)</Label>
@@ -1165,32 +1247,70 @@ const AdminSettings = () => {
                         </div>
                         <div className="grid gap-3 md:grid-cols-2">
                           <div>
-                            <Label>Primary Color (optional)</Label>
-                            <Input
-                              value={popupSettings.primary_color}
-                              onChange={(e) =>
-                                setPopupSettings({
-                                  ...popupSettings,
-                                  primary_color: e.target.value,
-                                })
-                              }
-                              className="mt-1 text-xs font-mono"
-                              placeholder="#e11d48"
-                            />
+                            <Label className="flex items-center gap-1 mb-1">
+                              <Palette className="w-3 h-3" />
+                              Primary Color (button / accents)
+                            </Label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={popupSettings.primary_color || "#e11d48"}
+                                onChange={(e) =>
+                                  setPopupSettings({
+                                    ...popupSettings,
+                                    primary_color: e.target.value,
+                                  })
+                                }
+                                className="w-9 h-9 rounded-md border cursor-pointer"
+                              />
+                              <Input
+                                value={popupSettings.primary_color}
+                                onChange={(e) =>
+                                  setPopupSettings({
+                                    ...popupSettings,
+                                    primary_color: e.target.value,
+                                  })
+                                }
+                                className="mt-0 text-xs font-mono"
+                                placeholder="#e11d48"
+                              />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                              Used for the main CTA button and highlight chips.
+                            </p>
                           </div>
                           <div>
-                            <Label>Background Color (optional)</Label>
-                            <Input
-                              value={popupSettings.background_color}
-                              onChange={(e) =>
-                                setPopupSettings({
-                                  ...popupSettings,
-                                  background_color: e.target.value,
-                                })
-                              }
-                              className="mt-1 text-xs font-mono"
-                              placeholder="#f8fafc"
-                            />
+                            <Label className="flex items-center gap-1 mb-1">
+                              <Palette className="w-3 h-3" />
+                              Background Color
+                            </Label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={popupSettings.background_color || "#f8fafc"}
+                                onChange={(e) =>
+                                  setPopupSettings({
+                                    ...popupSettings,
+                                    background_color: e.target.value,
+                                  })
+                                }
+                                className="w-9 h-9 rounded-md border cursor-pointer"
+                              />
+                              <Input
+                                value={popupSettings.background_color}
+                                onChange={(e) =>
+                                  setPopupSettings({
+                                    ...popupSettings,
+                                    background_color: e.target.value,
+                                  })
+                                }
+                                className="mt-0 text-xs font-mono"
+                                placeholder="#f8fafc"
+                              />
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-1">
+                              Overall card background behind text and image.
+                            </p>
                           </div>
                         </div>
                         {popupSettings.template_type === "lead" && (
