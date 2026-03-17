@@ -9,7 +9,9 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { supabase } from "@/lib/supabase";
 import { useTenant } from "@/context/TenantContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { ListSkeleton, FooterSpinner } from "@/components/SkeletonLoader";
+import NotificationPanel from "@/components/NotificationPanel";
 
 interface Booking {
   id: string;
@@ -313,6 +315,7 @@ const PAGE_SIZE = 20;
 
 export default function BookingsScreen() {
   const { tenantId } = useTenant();
+  const { unreadCount } = useNotifications();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [stayMap, setStayMap] = useState<Record<string, { name: string; image: string | null }>>({});
   const [filter, setFilter] = useState("all");
@@ -322,6 +325,7 @@ export default function BookingsScreen() {
   const [selected, setSelected] = useState<Booking | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const fetchPage = useCallback(async (offset: number, replace: boolean) => {
     if (!tenantId) return;
@@ -409,9 +413,27 @@ export default function BookingsScreen() {
       <View style={{ backgroundColor: headerBg, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <Text style={{ fontSize: 24, fontWeight: "800", color: titleColor, letterSpacing: -0.5 }}>Bookings</Text>
-          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(22,162,73,0.1)", alignItems: "center", justifyContent: "center" }}>
-            <MaterialCommunityIcons name="bell-outline" size={22} color="#16a34a" />
-          </View>
+          <TouchableOpacity
+            onPress={() => setShowNotifications(true)}
+            activeOpacity={0.7}
+            style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(22,162,73,0.1)", alignItems: "center", justifyContent: "center" }}
+          >
+            <MaterialCommunityIcons name={unreadCount > 0 ? "bell-ring" : "bell-outline"} size={22} color="#16a34a" />
+            {unreadCount > 0 && (
+              <View style={{
+                position: "absolute", top: 2, right: 2,
+                minWidth: 18, height: 18, borderRadius: 9,
+                backgroundColor: "#ef4444",
+                alignItems: "center", justifyContent: "center",
+                paddingHorizontal: 4,
+                borderWidth: 2, borderColor: isDark ? "#030712" : "#ffffff",
+              }}>
+                <Text style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Search */}
@@ -597,6 +619,18 @@ export default function BookingsScreen() {
           onStatusChange={updateStatus}
         />
       )}
+
+      <NotificationPanel
+        visible={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        onNotificationPress={(notif) => {
+          setShowNotifications(false);
+          if (notif.ref_id && (notif.type === "booking" || notif.type === "booking_status")) {
+            const bk = bookings.find((b) => b.id === notif.ref_id);
+            if (bk) setSelected(bk);
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }

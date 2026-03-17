@@ -62,7 +62,7 @@ function useLiveCategories() {
 }
 
 interface ReelItem { id?: string; title: string; thumbnail: string; url: string; platform: string; }
-interface NearbyItem { id?: string; name: string; image: string; distance: string; }
+interface NearbyItem { id?: string; name: string; image: string; distance: string; maps_link: string; description: string; tenant_id?: string | null; }
 interface ReviewItem { id?: string; guest_name: string; rating: number; comment: string; photos: string[]; }
 
 interface AddonItem { id?: string; name: string; price: number; optional: boolean; }
@@ -215,7 +215,7 @@ export function StayForm({ open, onOpenChange, stay, onSaved }: StayFormProps) {
       (supabase.from("stay_addons") as any).select("*").eq("stay_id", stayId).order("sort_order"),
     ]);
     if (reelsRes.data) setReels(reelsRes.data.map(r => ({ id: r.id, title: r.title, thumbnail: r.thumbnail, url: r.url, platform: r.platform })));
-    if (nearbyRes.data) setNearby(nearbyRes.data.map(n => ({ id: n.id, name: n.name, image: n.image, distance: n.distance })));
+    if (nearbyRes.data) setNearby(nearbyRes.data.map(n => ({ id: n.id, name: n.name, image: n.image, distance: n.distance, maps_link: n.maps_link || "", description: n.description || "", tenant_id: n.tenant_id })));
     if (reviewsRes.data) setReviews(reviewsRes.data.map(r => ({ id: r.id, guest_name: r.guest_name, rating: r.rating, comment: r.comment, photos: r.photos || [] })));
     if (roomsRes.data) setRoomCategories(roomsRes.data.map(r => ({
       id: r.id, name: r.name, max_guests: r.max_guests, available: r.available,
@@ -289,11 +289,11 @@ export function StayForm({ open, onOpenChange, stay, onSaved }: StayFormProps) {
     }
 
     if (savedStayId) {
-      await saveReels(savedStayId);
-      await saveNearby(savedStayId);
+      await saveReels(savedStayId, tenantId);
+      await saveNearby(savedStayId, tenantId);
       await saveNewReviews(savedStayId);
-      await saveRoomCategories(savedStayId);
-      await saveAddons(savedStayId);
+      await saveRoomCategories(savedStayId, tenantId);
+      await saveAddons(savedStayId, tenantId);
     }
 
     toast({
@@ -312,20 +312,25 @@ export function StayForm({ open, onOpenChange, stay, onSaved }: StayFormProps) {
     await saveStay(form.status === "draft" && stay ? form.status : "active");
   };
 
-  const saveReels = async (stayId: string) => {
+  const saveReels = async (stayId: string, tid: string | null) => {
     await supabase.from("stay_reels").delete().eq("stay_id", stayId);
     if (reels.length > 0) {
       await supabase.from("stay_reels").insert(
-        reels.map((r, i) => ({ stay_id: stayId, title: r.title, thumbnail: r.thumbnail, url: r.url, platform: r.platform, sort_order: i }))
+        reels.map((r, i) => ({ stay_id: stayId, title: r.title, thumbnail: r.thumbnail, url: r.url, platform: r.platform, sort_order: i, tenant_id: tid }))
       );
+
     }
   };
 
-  const saveNearby = async (stayId: string) => {
+  const saveNearby = async (stayId: string, tid: string | null) => {
     await supabase.from("nearby_destinations").delete().eq("stay_id", stayId);
     if (nearby.length > 0) {
       await supabase.from("nearby_destinations").insert(
-        nearby.map((n, i) => ({ stay_id: stayId, name: n.name, image: n.image, distance: n.distance, sort_order: i }))
+        nearby.map((n, i) => ({
+          stay_id: stayId, name: n.name, image: n.image, distance: n.distance,
+          maps_link: n.maps_link, description: n.description,
+          sort_order: i, tenant_id: tid,
+        }))
       );
     }
   };
@@ -339,12 +344,12 @@ export function StayForm({ open, onOpenChange, stay, onSaved }: StayFormProps) {
     }
   };
 
-  const saveRoomCategories = async (stayId: string) => {
+  const saveRoomCategories = async (stayId: string, tid: string | null) => {
     for (const id of deletedRoomIds) {
       await supabase.from("room_categories").delete().eq("id", id);
     }
     for (const room of roomCategories) {
-      const payload = {
+      const payload: Record<string, unknown> = {
         stay_id: stayId,
         name: room.name.trim(),
         max_guests: room.max_guests,
@@ -357,21 +362,23 @@ export function StayForm({ open, onOpenChange, stay, onSaved }: StayFormProps) {
       if (room.id) {
         await supabase.from("room_categories").update(payload).eq("id", room.id);
       } else {
+        payload.tenant_id = tid;
         await supabase.from("room_categories").insert([payload]);
       }
     }
   };
 
-  const saveAddons = async (stayId: string) => {
+  const saveAddons = async (stayId: string, tid: string | null) => {
     for (const id of deletedAddonIds) {
       await (supabase.from("stay_addons") as any).delete().eq("id", id);
     }
     for (let i = 0; i < addons.length; i++) {
       const addon = addons[i];
-      const payload = { stay_id: stayId, name: addon.name.trim(), price: addon.price, optional: addon.optional, sort_order: i };
+      const payload: Record<string, unknown> = { stay_id: stayId, name: addon.name.trim(), price: addon.price, optional: addon.optional, sort_order: i };
       if (addon.id) {
         await (supabase.from("stay_addons") as any).update(payload).eq("id", addon.id);
       } else {
+        payload.tenant_id = tid;
         await (supabase.from("stay_addons") as any).insert([payload]);
       }
     }
@@ -434,7 +441,7 @@ export function StayForm({ open, onOpenChange, stay, onSaved }: StayFormProps) {
 
   // Nearby helpers
   const addNearby = () => {
-    setNearby(prev => [...prev, { name: "", image: "", distance: "" }]);
+    setNearby(prev => [...prev, { name: "", image: "", distance: "", maps_link: "", description: "" }]);
   };
   const updateNearby = (i: number, field: keyof NearbyItem, val: string) => {
     setNearby(prev => prev.map((n, idx) => idx === i ? { ...n, [field]: val } : n));
@@ -1050,6 +1057,8 @@ export function StayForm({ open, onOpenChange, stay, onSaved }: StayFormProps) {
                         <Input value={place.distance} onChange={(e) => updateNearby(i, "distance", e.target.value)} placeholder="e.g. 5 km" />
                       </div>
                       <Input value={place.image} onChange={(e) => updateNearby(i, "image", e.target.value)} placeholder="Image URL" />
+                      <Input value={place.maps_link} onChange={(e) => updateNearby(i, "maps_link", e.target.value)} placeholder="Google Maps link" />
+                      <Textarea value={place.description} onChange={(e) => updateNearby(i, "description", e.target.value)} placeholder="About this place..." rows={3} />
                     </div>
                   ))}
                 </div>

@@ -32,6 +32,9 @@ interface Stay {
   seo_keywords: string | null;
   og_image_url: string | null;
   tenant_id: string | null;
+  max_adults: number;
+  max_children: number;
+  max_pets: number;
 }
 
 interface RoomCategory {
@@ -72,6 +75,18 @@ interface StayReel {
 
 const PLATFORMS = ["youtube", "instagram", "facebook", "tiktok"] as const;
 
+interface NearbyPlace {
+  id: string;
+  stay_id: string;
+  name: string;
+  image: string;
+  distance: string;
+  maps_link: string;
+  description: string;
+  sort_order: number;
+  tenant_id: string | null;
+}
+
 const ROOM_AMENITIES = [
   "TV", "AC", "Fan", "Kettle", "WiFi", "Geyser", "Wardrobe",
   "Mini Fridge", "Balcony", "Attached Bath", "Room Service", "Safe",
@@ -88,8 +103,8 @@ const AVAILABLE_AMENITIES = [
   "Lake View", "Bonfire", "BBQ Area", "Laundry",
 ];
 
-function StayEditModal({ stay, isDark, onClose, onSave }: {
-  stay: Stay; isDark: boolean; onClose: () => void; onSave: (updates: Partial<Stay>) => Promise<void>;
+function StayEditModal({ stay, isDark, onClose, onSave, isNew }: {
+  stay: Stay; isDark: boolean; onClose: () => void; onSave: (updates: Partial<Stay>) => Promise<void>; isNew?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<TabName>("Basic");
   const [saving, setSaving] = useState(false);
@@ -101,6 +116,9 @@ function StayEditModal({ stay, isDark, onClose, onSave }: {
   const [status, setStatus] = useState(stay.status || "active");
   const [price, setPrice] = useState(String(stay.price || 0));
   const [originalPrice, setOriginalPrice] = useState(String(stay.original_price || 0));
+  const [maxAdults, setMaxAdults] = useState(stay.max_adults ?? 20);
+  const [maxChildren, setMaxChildren] = useState(stay.max_children ?? 5);
+  const [maxPets, setMaxPets] = useState(stay.max_pets ?? 5);
   const [amenities, setAmenities] = useState<string[]>(stay.amenities || []);
   const [images, setImages] = useState<string[]>(stay.images || []);
   const [uploading, setUploading] = useState(false);
@@ -285,6 +303,95 @@ function StayEditModal({ stay, isDark, onClose, onSave }: {
     ]);
   };
 
+  // --- Nearby Places ---
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
+  const nearbyRef = useRef<NearbyPlace[]>([]);
+  nearbyRef.current = nearbyPlaces;
+  const [nearbyLoading, setNearbyLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("nearby_destinations")
+        .select("*")
+        .eq("stay_id", stay.id)
+        .order("sort_order");
+      setNearbyPlaces((data || []) as NearbyPlace[]);
+      setNearbyLoading(false);
+    })();
+  }, [stay.id]);
+
+  const addNearbyPlace = async () => {
+    if (!stay.tenant_id) {
+      Alert.alert("Error", "Missing tenant. Please reload the stay.");
+      return;
+    }
+    const { data, error } = await supabase.from("nearby_destinations")
+      .insert({
+        name: "New Place",
+        image: "",
+        distance: "",
+        maps_link: "",
+        description: "",
+        sort_order: nearbyPlaces.length,
+        stay_id: stay.id,
+        tenant_id: stay.tenant_id,
+      })
+      .select()
+      .single();
+    if (error) { Alert.alert("Error", error.message); return; }
+    if (data) setNearbyPlaces(prev => [...prev, data as NearbyPlace]);
+  };
+
+  const updateNearbyPlace = async (id: string, updates: Partial<NearbyPlace>) => {
+    setNearbyPlaces(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    const { error } = await supabase.from("nearby_destinations").update(updates).eq("id", id);
+    if (error) Alert.alert("Error", error.message);
+  };
+
+  const syncNearbyField = async (id: string, field: keyof NearbyPlace) => {
+    const item = nearbyRef.current.find(p => p.id === id);
+    if (!item) return;
+    const { error } = await supabase.from("nearby_destinations").update({ [field]: item[field] }).eq("id", id);
+    if (error) Alert.alert("Error", error.message);
+  };
+
+  const deleteNearbyPlace = async (id: string) => {
+    Alert.alert("Delete Place", "Remove this nearby place?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete", style: "destructive",
+        onPress: async () => {
+          const { error } = await supabase.from("nearby_destinations").delete().eq("id", id);
+          if (error) { Alert.alert("Error", error.message); return; }
+          setNearbyPlaces(prev => prev.filter(p => p.id !== id));
+        },
+      },
+    ]);
+  };
+
+  const pickNearbyPhoto = async (placeId: string) => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.8,
+      base64: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    if (!asset.base64) { Alert.alert("Error", "Could not read image"); return; }
+
+    const ext = asset.uri.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `nearby/${stay.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("stay-images")
+      .upload(path, decode(asset.base64), { contentType: `image/${ext}`, upsert: true });
+    if (upErr) { Alert.alert("Upload Error", upErr.message); return; }
+
+    const { data: { publicUrl } } = supabase.storage.from("stay-images").getPublicUrl(path);
+    updateNearbyPlace(placeId, { image: publicUrl });
+  };
+
   const MAX_PHOTOS = 6;
 
   const pickAndUpload = async () => {
@@ -376,6 +483,7 @@ function StayEditModal({ stay, isDark, onClose, onSave }: {
       name, location, description, category, status,
       price: Number(price), original_price: Number(originalPrice),
       amenities, images,
+      max_adults: maxAdults, max_children: maxChildren, max_pets: maxPets,
     });
     setSaving(false);
   };
@@ -477,43 +585,110 @@ function StayEditModal({ stay, isDark, onClose, onSave }: {
         </View>
       </View>
 
-      {/* Prices row */}
-      <View style={{ flexDirection: "row", gap: 16 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 11, fontWeight: "700", color: labelText, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Current Price (₹)</Text>
-          <TextInput
-            style={{ borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, fontWeight: "700", color: inputText, backgroundColor: inputBg }}
-            value={price}
-            onChangeText={setPrice}
-            keyboardType="numeric"
-          />
+      {/* Pricing Section */}
+      <View style={{ backgroundColor: isDark ? "#111827" : "#f9fafb", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: isDark ? "#1f2937" : "#f1f5f9", gap: 16 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={{ padding: 6, borderRadius: 8, backgroundColor: isDark ? "rgba(22,162,73,0.15)" : "#dcfce7" }}>
+            <MaterialCommunityIcons name="tag-outline" size={16} color="#16a34a" />
+          </View>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: inputText }}>Pricing</Text>
+          {Number(originalPrice) > Number(price) && Number(price) > 0 && (
+            <View style={{ backgroundColor: "#dc2626", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginLeft: "auto" }}>
+              <Text style={{ fontSize: 11, fontWeight: "800", color: "#ffffff" }}>
+                {Math.round(((Number(originalPrice) - Number(price)) / Number(originalPrice)) * 100)}% OFF
+              </Text>
+            </View>
+          )}
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 11, fontWeight: "700", color: labelText, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Original Price (₹)</Text>
-          <TextInput
-            style={{ borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: isDark ? "#6b7280" : "#94a3b8", backgroundColor: inputBg, textDecorationLine: "line-through" }}
-            value={originalPrice}
-            onChangeText={setOriginalPrice}
-            keyboardType="numeric"
-          />
+
+        {/* Current Price */}
+        <View>
+          <Text style={{ fontSize: 10, fontWeight: "700", color: labelText, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Selling Price</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: inputBg, borderWidth: 1.5, borderColor: "#16a34a", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: "#16a34a", marginRight: 4 }}>₹</Text>
+            <TextInput
+              style={{ flex: 1, fontSize: 22, fontWeight: "900", color: "#16a34a", padding: 0, paddingVertical: 8 }}
+              value={price}
+              onChangeText={(t) => setPrice(t.replace(/[^0-9]/g, ""))}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor={isDark ? "#374151" : "#d1d5db"}
+            />
+            <Text style={{ fontSize: 11, fontWeight: "600", color: labelText }}>/night</Text>
+          </View>
+        </View>
+
+        {/* Original Price */}
+        <View>
+          <Text style={{ fontSize: 10, fontWeight: "700", color: labelText, textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>Original Price (MRP)</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 4 }}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: isDark ? "#4b5563" : "#94a3b8", marginRight: 4 }}>₹</Text>
+            <TextInput
+              style={{ flex: 1, fontSize: 18, fontWeight: "700", color: isDark ? "#6b7280" : "#94a3b8", padding: 0, paddingVertical: 8, textDecorationLine: Number(originalPrice) > Number(price) ? "line-through" : "none" }}
+              value={originalPrice}
+              onChangeText={(t) => setOriginalPrice(t.replace(/[^0-9]/g, ""))}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor={isDark ? "#374151" : "#d1d5db"}
+            />
+            <Text style={{ fontSize: 11, fontWeight: "600", color: labelText }}>/night</Text>
+          </View>
         </View>
       </View>
 
-      {/* Guest Limits */}
-      <View>
-        <Text style={{ fontSize: 11, fontWeight: "700", color: labelText, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Guest Limits</Text>
-        <View style={{ flexDirection: "row", gap: 12 }}>
-          {[
-            { label: "Adults", value: "4" },
-            { label: "Kids", value: "2" },
-            { label: "Pets", value: "1" },
-          ].map(g => (
-            <View key={g.label} style={{ flex: 1, alignItems: "center", backgroundColor: chipBg, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: chipBorder }}>
-              <Text style={{ fontSize: 10, fontWeight: "700", color: isDark ? "#6b7280" : "#94a3b8", textTransform: "uppercase" }}>{g.label}</Text>
-              <Text style={{ fontSize: 18, fontWeight: "700", color: inputText, marginTop: 2 }}>{g.value}</Text>
-            </View>
-          ))}
+      {/* Guest Limits Section */}
+      <View style={{ backgroundColor: isDark ? "#111827" : "#f9fafb", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: isDark ? "#1f2937" : "#f1f5f9", gap: 14 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={{ padding: 6, borderRadius: 8, backgroundColor: isDark ? "rgba(22,162,73,0.15)" : "#dcfce7" }}>
+            <MaterialCommunityIcons name="account-group-outline" size={16} color="#16a34a" />
+          </View>
+          <Text style={{ fontSize: 13, fontWeight: "700", color: inputText }}>Guest Limits</Text>
         </View>
+
+        {[
+          { label: "Adults", icon: "account" as const, value: maxAdults, setValue: setMaxAdults, min: 1, max: 50 },
+          { label: "Children", icon: "human-child" as const, value: maxChildren, setValue: setMaxChildren, min: 1, max: 20 },
+          { label: "Pets", icon: "paw" as const, value: maxPets, setValue: setMaxPets, min: 1, max: 10 },
+        ].map(g => (
+          <View
+            key={g.label}
+            style={{
+              flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+              backgroundColor: modalBg, borderRadius: 12, padding: 14,
+              borderWidth: 1, borderColor: isDark ? "#1f2937" : "#e5e7eb",
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <MaterialCommunityIcons name={g.icon} size={20} color={isDark ? "#9ca3af" : "#6b7280"} />
+              <Text style={{ fontSize: 14, fontWeight: "600", color: inputText }}>{g.label}</Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <TouchableOpacity
+                onPress={() => g.setValue(Math.max(g.min, g.value - 1))}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  backgroundColor: isDark ? "#1f2937" : "#f1f5f9",
+                  alignItems: "center", justifyContent: "center",
+                  opacity: g.value <= g.min ? 0.4 : 1,
+                }}
+              >
+                <MaterialCommunityIcons name="minus" size={16} color={isDark ? "#d1d5db" : "#475569"} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: inputText, minWidth: 28, textAlign: "center" }}>{g.value}</Text>
+              <TouchableOpacity
+                onPress={() => g.setValue(Math.min(g.max, g.value + 1))}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  backgroundColor: isDark ? "rgba(22,162,73,0.1)" : "rgba(22,162,73,0.08)",
+                  alignItems: "center", justifyContent: "center",
+                  opacity: g.value >= g.max ? 0.4 : 1,
+                }}
+              >
+                <MaterialCommunityIcons name="plus" size={16} color="#16a34a" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
       </View>
 
       {/* Amenities */}
@@ -1165,6 +1340,154 @@ function StayEditModal({ stay, isDark, onClose, onSave }: {
     </View>
   );
 
+  const renderNearbyTab = () => (
+    <View style={{ padding: 20, gap: 16 }}>
+      {/* Header */}
+      <View>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={{ fontSize: 18, fontWeight: "700", color: inputText }}>Nearby Places</Text>
+          <TouchableOpacity
+            onPress={addNearbyPlace}
+            style={{
+              flexDirection: "row", alignItems: "center", gap: 4,
+              backgroundColor: isDark ? "rgba(22,162,73,0.1)" : "#f0fdf4",
+              paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999,
+            }}
+          >
+            <MaterialCommunityIcons name="plus" size={16} color="#16a34a" />
+            <Text style={{ fontSize: 13, fontWeight: "600", color: "#16a34a" }}>Add Place</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={{ fontSize: 13, color: labelText, marginTop: 6, lineHeight: 18 }}>
+          List popular attractions or landmarks near your property to help guests plan their stay.
+        </Text>
+      </View>
+
+      {nearbyLoading ? (
+        <ActivityIndicator color="#16a34a" style={{ marginTop: 40 }} />
+      ) : (
+        <>
+          {nearbyPlaces.map((place) => (
+            <View
+              key={place.id}
+              style={{
+                backgroundColor: modalBg,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: isDark ? "#1f2937" : "#e5e7eb",
+                padding: 16,
+                gap: 14,
+              }}
+            >
+              {/* Name + distance + delete */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <TextInput
+                    style={{ fontSize: 16, fontWeight: "700", color: inputText, padding: 0 }}
+                    value={place.name}
+                    onChangeText={(t) => setNearbyPlaces(prev => prev.map(p => p.id === place.id ? { ...p, name: t } : p))}
+                    onBlur={() => syncNearbyField(place.id, "name")}
+                    placeholder="Place name"
+                    placeholderTextColor={isDark ? "#4b5563" : "#9ca3af"}
+                  />
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <TextInput
+                      style={{
+                        fontSize: 12, fontWeight: "500", color: isDark ? "#9ca3af" : "#6b7280",
+                        backgroundColor: isDark ? "#1f2937" : "#f3f4f6",
+                        paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, padding: 0,
+                        minWidth: 60,
+                      }}
+                      value={place.distance}
+                      onChangeText={(t) => setNearbyPlaces(prev => prev.map(p => p.id === place.id ? { ...p, distance: t } : p))}
+                      onBlur={() => syncNearbyField(place.id, "distance")}
+                      placeholder="e.g. 2 km away"
+                      placeholderTextColor={isDark ? "#4b5563" : "#9ca3af"}
+                    />
+                  </View>
+                </View>
+                <TouchableOpacity onPress={() => deleteNearbyPlace(place.id)} style={{ padding: 4 }}>
+                  <MaterialCommunityIcons name="trash-can-outline" size={20} color={isDark ? "#4b5563" : "#9ca3af"} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Place Photo */}
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: isDark ? "#9ca3af" : "#374151", marginBottom: 6 }}>Place Photo</Text>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  {place.image ? (
+                    <View style={{ width: 96, height: 96, borderRadius: 10, overflow: "hidden", backgroundColor: isDark ? "#1f2937" : "#f3f4f6" }}>
+                      <Image source={{ uri: place.image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                    </View>
+                  ) : null}
+                  <TouchableOpacity
+                    onPress={() => pickNearbyPhoto(place.id)}
+                    style={{
+                      flex: 1, borderWidth: 2, borderStyle: "dashed",
+                      borderColor: isDark ? "#374151" : "#e5e7eb",
+                      borderRadius: 10, alignItems: "center", justifyContent: "center",
+                      paddingVertical: place.image ? 0 : 20, gap: 4,
+                      minHeight: 96,
+                    }}
+                  >
+                    <MaterialCommunityIcons name="image-outline" size={24} color={isDark ? "#4b5563" : "#9ca3af"} />
+                    <Text style={{ fontSize: 10, fontWeight: "600", color: isDark ? "#4b5563" : "#6b7280" }}>Upload Photo</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Google Maps Link */}
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: isDark ? "#9ca3af" : "#374151", marginBottom: 6 }}>Google Maps Link</Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <TextInput
+                    style={{
+                      flex: 1, backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder,
+                      borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, paddingRight: 36,
+                      fontSize: 14, color: inputText,
+                    }}
+                    value={place.maps_link}
+                    onChangeText={(t) => setNearbyPlaces(prev => prev.map(p => p.id === place.id ? { ...p, maps_link: t } : p))}
+                    onBlur={() => syncNearbyField(place.id, "maps_link")}
+                    placeholder="https://maps.app.goo.gl/..."
+                    placeholderTextColor={isDark ? "#4b5563" : "#9ca3af"}
+                    keyboardType="url"
+                    autoCapitalize="none"
+                  />
+                  <View style={{ position: "absolute", right: 12 }}>
+                    <MaterialCommunityIcons name="map-marker-outline" size={18} color={isDark ? "#4b5563" : "#9ca3af"} />
+                  </View>
+                </View>
+              </View>
+
+              {/* About Place */}
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: isDark ? "#9ca3af" : "#374151", marginBottom: 6 }}>About Place</Text>
+                <TextInput
+                  style={{
+                    backgroundColor: inputBg, borderWidth: 1, borderColor: inputBorder,
+                    borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10,
+                    fontSize: 14, color: inputText, minHeight: 140,
+                    textAlignVertical: "top",
+                  }}
+                  value={place.description}
+                  onChangeText={(t) => setNearbyPlaces(prev => prev.map(p => p.id === place.id ? { ...p, description: t } : p))}
+                  onBlur={() => syncNearbyField(place.id, "description")}
+                  placeholder="Describe why guests should visit this place..."
+                  placeholderTextColor={isDark ? "#4b5563" : "#9ca3af"}
+                  multiline
+                  numberOfLines={6}
+                />
+              </View>
+            </View>
+          ))}
+        </>
+      )}
+
+      <View style={{ height: 140 }} />
+    </View>
+  );
+
   const renderPlaceholderTab = (tabName: string) => (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 }}>
       <MaterialCommunityIcons
@@ -1190,7 +1513,7 @@ function StayEditModal({ stay, isDark, onClose, onSave }: {
       <SafeAreaView style={{ flex: 1, backgroundColor: modalBg }}>
         {/* Header */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 24, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: borderC }}>
-          <Text style={{ fontSize: 20, fontWeight: "700", color: inputText }}>Edit Stay</Text>
+          <Text style={{ fontSize: 20, fontWeight: "700", color: inputText }}>{isNew ? "Add New Stay" : "Edit Stay"}</Text>
           <TouchableOpacity onPress={onClose} style={{ padding: 8, marginRight: -8 }}>
             <MaterialCommunityIcons name="close" size={24} color={isDark ? "#9ca3af" : "#94a3b8"} />
           </TouchableOpacity>
@@ -1226,6 +1549,7 @@ function StayEditModal({ stay, isDark, onClose, onSave }: {
            activeTab === "Rooms" ? renderRoomsTab() :
            activeTab === "Add-ons" ? renderAddOnsTab() :
            activeTab === "Reels" ? renderReelsTab() :
+           activeTab === "Nearby" ? renderNearbyTab() :
            renderPlaceholderTab(activeTab)}
         </ScrollView>
 
@@ -1396,7 +1720,7 @@ function RoomEditSheet({ room, isDark, onClose, onSave }: {
               placeholder="e.g. Deluxe AC"
               placeholderTextColor={isDark ? "#6b7280" : "#94a3b8"}
             />
-          </View>
+            </View>
 
           {/* Room Photos */}
           <View style={{ marginBottom: 20 }}>
@@ -1411,10 +1735,10 @@ function RoomEditSheet({ room, isDark, onClose, onSave }: {
                   >
                     <MaterialCommunityIcons name="close" size={11} color="#fff" />
                   </TouchableOpacity>
-                </View>
+          </View>
               ))}
               {roomImages.length < MAX_ROOM_PHOTOS && (
-                <TouchableOpacity
+          <TouchableOpacity
                   onPress={pickRoomPhotos}
                   disabled={uploading}
                   style={{
@@ -1520,8 +1844,8 @@ function RoomEditSheet({ room, isDark, onClose, onSave }: {
   );
 }
 
-function StayCard({ stay, isDark, onEdit, onToggle }: {
-  stay: Stay; isDark: boolean; onEdit: () => void; onToggle: () => void;
+function StayCard({ stay, isDark, onEdit, onToggle, onDelete }: {
+  stay: Stay; isDark: boolean; onEdit: () => void; onToggle: () => void; onDelete: () => void;
 }) {
   const isActive = stay.status === "active";
   const cardBg = isDark
@@ -1586,7 +1910,7 @@ function StayCard({ stay, isDark, onEdit, onToggle }: {
       {/* Action buttons */}
       <View style={{ flexDirection: "row", borderTopWidth: 1, borderTopColor: isDark ? "#1f2937" : "#f1f5f9", padding: 10, gap: 8 }}>
         <TouchableOpacity
-          style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 8, backgroundColor: isDark ? "#1f2937" : "#f1f5f9" }}
+          style={{ flex: 1.1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 8, backgroundColor: isDark ? "#1f2937" : "#f1f5f9" }}
           onPress={onEdit}
         >
           <MaterialCommunityIcons name="pencil-outline" size={16} color={isDark ? "#d1d5db" : "#475569"} />
@@ -1595,7 +1919,7 @@ function StayCard({ stay, isDark, onEdit, onToggle }: {
 
         {isActive ? (
           <TouchableOpacity
-            style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 8, backgroundColor: isDark ? "rgba(239,68,68,0.1)" : "#fef2f2", borderWidth: 1, borderColor: isDark ? "rgba(239,68,68,0.2)" : "#fee2e2" }}
+            style={{ flex: 1.1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 8, backgroundColor: isDark ? "rgba(239,68,68,0.1)" : "#fef2f2", borderWidth: 1, borderColor: isDark ? "rgba(239,68,68,0.2)" : "#fee2e2" }}
             onPress={onToggle}
           >
             <MaterialCommunityIcons name="power" size={16} color="#dc2626" />
@@ -1603,13 +1927,20 @@ function StayCard({ stay, isDark, onEdit, onToggle }: {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 8, backgroundColor: "#16a34a" }}
+            style={{ flex: 1.1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 8, backgroundColor: "#16a34a" }}
             onPress={onToggle}
           >
             <MaterialCommunityIcons name="play" size={16} color="#fff" />
             <Text style={{ fontSize: 12, fontWeight: "700", color: "#fff" }}>Activate</Text>
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity
+          onPress={onDelete}
+          style={{ width: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", paddingVertical: 8, backgroundColor: isDark ? "rgba(15,23,42,0.9)" : "#fef2f2" }}
+        >
+          <MaterialCommunityIcons name="trash-can-outline" size={18} color={isDark ? "#f97373" : "#dc2626"} />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -1626,6 +1957,8 @@ export default function StaysScreen() {
   const [editing, setEditing] = useState<Stay | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [isNewStay, setIsNewStay] = useState(false);
 
   const bg = isDark ? "#030712" : "#ffffff";
   const headerBg = isDark ? "rgba(3,7,18,0.8)" : "rgba(255,255,255,0.8)";
@@ -1639,7 +1972,7 @@ export default function StaysScreen() {
     if (!tenantId) return;
     const { data } = await supabase
       .from("stays")
-      .select("id, stay_id, name, location, price, original_price, status, rating, reviews_count, category, images, description, amenities, seo_title, seo_description, seo_keywords, og_image_url, tenant_id")
+      .select("id, stay_id, name, location, price, original_price, status, rating, reviews_count, category, images, description, amenities, seo_title, seo_description, seo_keywords, og_image_url, tenant_id, max_adults, max_children, max_pets")
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .range(offset, offset + STAYS_PAGE - 1);
@@ -1680,17 +2013,88 @@ export default function StaysScreen() {
     setEditing(null);
   };
 
+  const deleteStay = async (stay: Stay) => {
+    Alert.alert(
+      "Delete stay",
+      `Are you sure you want to delete “${stay.name}”? This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            const { error } = await supabase
+              .from("stays")
+              .delete()
+              .eq("id", stay.id);
+            if (error) {
+              Alert.alert("Error", error.message);
+              return;
+            }
+            setStays(prev => prev.filter(s => s.id !== stay.id));
+            if (editing?.id === stay.id) {
+              setEditing(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const addStay = async () => {
+    if (!tenantId || creating) return;
+    setCreating(true);
+    const stayId = "STAY-" + Date.now().toString(36).toUpperCase();
+    const { data, error } = await supabase
+      .from("stays")
+      .insert({ stay_id: stayId, name: "New Stay", tenant_id: tenantId })
+      .select("id, stay_id, name, location, price, original_price, status, rating, reviews_count, category, images, description, amenities, seo_title, seo_description, seo_keywords, og_image_url, tenant_id, max_adults, max_children, max_pets")
+      .single();
+    setCreating(false);
+    if (error) { Alert.alert("Error", error.message); return; }
+    const newStay = data as Stay;
+    setStays(prev => [newStay, ...prev]);
+    setIsNewStay(true);
+    setEditing(newStay);
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: bg }}>
       {/* Header */}
       <View style={{ backgroundColor: headerBg, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: borderC }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-          <Text style={{ fontSize: 24, fontWeight: "800", color: titleColor, letterSpacing: -0.5 }}>Stays</Text>
-          <TouchableOpacity style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" }}>
-            <MaterialCommunityIcons name="magnify" size={24} color="#16a34a" />
+          <View>
+            <Text style={{ fontSize: 24, fontWeight: "800", color: titleColor, letterSpacing: -0.5 }}>Stays</Text>
+            <Text style={{ fontSize: 13, fontWeight: "500", color: subColor, marginTop: 2 }}>{activeCount} active propert{activeCount !== 1 ? "ies" : "y"}</Text>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={addStay}
+            disabled={creating}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              backgroundColor: "#16a34a",
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              borderRadius: 12,
+              shadowColor: "#16a34a",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.2,
+              shadowRadius: 8,
+              elevation: 4,
+              opacity: creating ? 0.7 : 1,
+            }}
+          >
+            {creating ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+            )}
+            <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700" }}>Add Stay</Text>
           </TouchableOpacity>
         </View>
-        <Text style={{ fontSize: 13, fontWeight: "500", color: subColor }}>{activeCount} active propert{activeCount !== 1 ? "ies" : "y"}</Text>
       </View>
 
       {loading ? (
@@ -1707,12 +2111,12 @@ export default function StaysScreen() {
                 <Text style={{ fontSize: 11, fontWeight: "600", color: subColor, textTransform: "uppercase", letterSpacing: 1 }}>Total Revenue</Text>
                 <Text style={{ fontSize: 17, fontWeight: "800", color: "#16a34a", marginTop: 2 }}>
                   ₹{stays.filter(s => s.status === "active").reduce((sum, s) => sum + s.price, 0).toLocaleString("en-IN")}
-                </Text>
-              </View>
+                  </Text>
+                </View>
               <View style={{ flex: 1, backgroundColor: isDark ? "rgba(22,162,73,0.08)" : "rgba(22,162,73,0.05)", borderWidth: 1, borderColor: isDark ? "rgba(22,162,73,0.15)" : "rgba(22,162,73,0.1)", borderRadius: 12, padding: 14 }}>
                 <Text style={{ fontSize: 11, fontWeight: "600", color: subColor, textTransform: "uppercase", letterSpacing: 1 }}>Properties</Text>
                 <Text style={{ fontSize: 17, fontWeight: "800", color: "#16a34a", marginTop: 2 }}>{stays.length} Total</Text>
-              </View>
+                  </View>
             </View>
           }
           ListFooterComponent={
@@ -1723,17 +2127,50 @@ export default function StaysScreen() {
           }
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListEmptyComponent={
-            <View style={{ paddingVertical: 64, alignItems: "center" }}>
-              <MaterialCommunityIcons name="home-outline" size={48} color={isDark ? "#374151" : "#cbd5e1"} />
-              <Text style={{ color: isDark ? "#6b7280" : "#94a3b8", marginTop: 12, fontSize: 14 }}>No stays yet</Text>
-            </View>
+            <View style={{ paddingVertical: 64, alignItems: "center", paddingHorizontal: 32 }}>
+              <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: isDark ? "rgba(22,162,73,0.08)" : "rgba(22,162,73,0.06)", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
+                <MaterialCommunityIcons name="home-plus-outline" size={36} color={isDark ? "#374151" : "#cbd5e1"} />
+              </View>
+              <Text style={{ color: titleColor, fontSize: 17, fontWeight: "700", marginBottom: 6 }}>No stays yet</Text>
+              <Text style={{ color: subColor, fontSize: 13, textAlign: "center", lineHeight: 20, marginBottom: 20 }}>Add your first property to start managing bookings</Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={addStay}
+                disabled={creating}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  backgroundColor: "#16a34a",
+                  paddingHorizontal: 24,
+                  paddingVertical: 14,
+                  borderRadius: 14,
+                  shadowColor: "#16a34a",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 10,
+                  elevation: 6,
+                }}
+              >
+                {creating ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+                )}
+                <Text style={{ color: "#fff", fontSize: 15, fontWeight: "700" }}>Add Your First Stay</Text>
+              </TouchableOpacity>
+                </View>
           }
           renderItem={({ item: s }) => (
             <StayCard
               stay={s}
               isDark={isDark}
-              onEdit={() => setEditing(s)}
+              onEdit={() => {
+                setIsNewStay(false);
+                setEditing(s);
+              }}
               onToggle={() => toggleStatus(s.id, s.status)}
+              onDelete={() => deleteStay(s)}
             />
           )}
         />
@@ -1745,6 +2182,7 @@ export default function StaysScreen() {
           isDark={isDark}
           onClose={() => setEditing(null)}
           onSave={saveStay}
+          isNew={isNewStay}
         />
       )}
     </SafeAreaView>

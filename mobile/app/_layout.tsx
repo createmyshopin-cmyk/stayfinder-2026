@@ -6,6 +6,8 @@ import { StatusBar } from "expo-status-bar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TenantProvider } from "@/context/TenantContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
+import { NotificationProvider } from "@/context/NotificationContext";
+import NotificationPopup from "@/components/NotificationPopup";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +22,7 @@ function InnerLayout() {
     <View className={`flex-1 ${isDark ? "dark" : ""}`}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <Stack screenOptions={{ headerShown: false }} />
+      <NotificationPopup />
     </View>
   );
 }
@@ -30,7 +33,9 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <TenantProvider>
           <ThemeProvider>
-            <InnerLayout />
+            <NotificationProvider>
+              <InnerLayout />
+            </NotificationProvider>
           </ThemeProvider>
         </TenantProvider>
       </QueryClientProvider>

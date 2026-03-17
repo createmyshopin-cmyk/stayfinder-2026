@@ -11,6 +11,7 @@ interface SubscriptionStatus {
   daysRemaining: number | null;
   plan: any;
   usage: any;
+  subscription: any;
   canAccessFeatures: boolean;
 }
 
@@ -25,6 +26,7 @@ export function useSubscriptionGuard(): SubscriptionStatus {
     daysRemaining: null,
     plan: null,
     usage: null,
+    subscription: null,
     canAccessFeatures: true,
   });
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -34,6 +36,9 @@ export function useSubscriptionGuard(): SubscriptionStatus {
     if (!tenant) { setState((s) => ({ ...s, loading: false })); return; }
 
     setTenantId(tenant.id);
+
+    // Refresh usage counts from source tables before reading
+    try { await supabase.rpc("refresh_tenant_usage", { p_tenant_id: tenant.id }); } catch (_) {}
 
     const [subRes, usageRes] = await Promise.all([
       supabase
@@ -79,6 +84,7 @@ export function useSubscriptionGuard(): SubscriptionStatus {
       daysRemaining,
       plan,
       usage,
+      subscription: sub,
       canAccessFeatures: !isExpired && !isSuspended,
     });
   };
