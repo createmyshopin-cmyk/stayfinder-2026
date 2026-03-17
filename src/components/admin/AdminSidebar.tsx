@@ -1,4 +1,4 @@
-import { LayoutDashboard, Building2, CalendarCheck, Settings, Tag, Star, LogOut, DoorOpen, FileText, Receipt, User, Globe, BarChart3, CreditCard, ChevronDown, CalendarDays, Clapperboard, BookOpen, ImageIcon, Search, Lock } from "lucide-react";
+import { LayoutDashboard, Building2, CalendarCheck, Settings, Tag, Star, LogOut, DoorOpen, FileText, Receipt, User, Globe, BarChart3, CreditCard, ChevronDown, CalendarDays, Clapperboard, BookOpen, ImageIcon, Search, Lock, UserPlus } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useState } from "react";
@@ -33,6 +33,7 @@ const staysSubItems = [
 const bookingsSubItems = [
   { title: "Booking List", url: "/admin/bookings", icon: CalendarCheck },
   { title: "Guest Contacts", url: "/admin/guest-contacts", icon: User },
+  { title: "Leads", url: "/admin/leads", icon: UserPlus },
 ];
 
 const quotationsSubItems = [

@@ -72,6 +72,11 @@ interface PopupSettings {
   delay_seconds: number;
   show_once: boolean;
   coupon_code: string;
+  template_type: "lead" | "coupon" | "offer" | "stats" | "announcement";
+  subtitle: string;
+  stats_text: string;
+  primary_color: string;
+  background_color: string;
 }
 
 interface FeatureItem {
@@ -141,8 +146,38 @@ const AdminSettings = () => {
 
       setMenuItems((menu || []) as MenuItem[]);
       if (popup) {
-        const { enabled, title, message, cta_text, cta_link, image_url, delay_seconds, show_once, coupon_code } = popup;
-        setPopupSettings({ enabled, title, message, cta_text, cta_link, image_url, delay_seconds, show_once, coupon_code });
+        const {
+          enabled,
+          title,
+          message,
+          cta_text,
+          cta_link,
+          image_url,
+          delay_seconds,
+          show_once,
+          coupon_code,
+          template_type,
+          subtitle,
+          stats_text,
+          primary_color,
+          background_color,
+        } = popup;
+        setPopupSettings({
+          enabled,
+          title,
+          message,
+          cta_text,
+          cta_link,
+          image_url,
+          delay_seconds,
+          show_once,
+          coupon_code,
+          template_type: (template_type || "lead") as PopupSettings["template_type"],
+          subtitle: subtitle || "",
+          stats_text: stats_text || "",
+          primary_color: primary_color || "",
+          background_color: background_color || "",
+        });
       } else {
         setPopupSettings({
           enabled: false,
@@ -154,6 +189,11 @@ const AdminSettings = () => {
           delay_seconds: 3,
           show_once: true,
           coupon_code: "",
+          template_type: "lead",
+          subtitle: "",
+          stats_text: "",
+          primary_color: "",
+          background_color: "",
         });
       }
       setFeatures((feats || []) as FeatureItem[]);
@@ -178,9 +218,40 @@ const AdminSettings = () => {
       }).eq("id", tenant.id) : Promise.resolve({ error: null }),
     ]);
 
+    let popupErr: { message?: string } | null = null;
+    if (popupSettings) {
+      const tenantId = tenant?.id || (await supabase.rpc("get_my_tenant_id")).data;
+      if (tenantId) {
+        const { error } = await supabase
+          .from("popup_settings")
+          .upsert(
+            {
+              tenant_id: tenantId,
+              enabled: popupSettings.enabled,
+              title: popupSettings.title,
+              subtitle: popupSettings.subtitle,
+              message: popupSettings.message,
+              cta_text: popupSettings.cta_text,
+              cta_link: popupSettings.cta_link,
+              image_url: popupSettings.image_url,
+              delay_seconds: popupSettings.delay_seconds,
+              show_once: popupSettings.show_once,
+              coupon_code: popupSettings.coupon_code,
+              template_type: popupSettings.template_type,
+              stats_text: popupSettings.stats_text,
+              primary_color: popupSettings.primary_color,
+              background_color: popupSettings.background_color,
+              updated_at: new Date().toISOString(),
+            } as any,
+            { onConflict: "tenant_id" },
+          );
+        popupErr = error;
+      }
+    }
+
     setSaving(false);
-    if (settingsErr || brandingErr) {
-      toast({ title: "Error", description: (settingsErr || brandingErr)?.message, variant: "destructive" });
+    if (settingsErr || brandingErr || popupErr) {
+      toast({ title: "Error", description: (settingsErr || brandingErr || popupErr)?.message, variant: "destructive" });
     } else {
       clearSiteSettingsCache(); // ensure public pages pick up the new maintenance_mode value
       toast({ title: "Settings saved" });
@@ -902,6 +973,37 @@ const AdminSettings = () => {
               <TabsContent value="promo-popup" className="mt-4 space-y-4">
                 {popupSettings && (
                   <>
+                    <div>
+                      <Label className="text-xs font-semibold">Popup Template</Label>
+                      <div className="grid gap-2 mt-2 sm:grid-cols-2 lg:grid-cols-5">
+                        {[
+                          { key: "lead", label: "Lead Capture", hint: "Form + save to Leads" },
+                          { key: "coupon", label: "Coupon", hint: "Code highlight + copy" },
+                          { key: "offer", label: "Offer", hint: "Limited-time deal" },
+                          { key: "stats", label: "Show Stats", hint: "Social proof numbers" },
+                          { key: "announcement", label: "Announcement", hint: "Simple message popup" },
+                        ].map((tpl) => (
+                          <button
+                            key={tpl.key}
+                            type="button"
+                            onClick={() =>
+                              setPopupSettings({
+                                ...popupSettings,
+                                template_type: tpl.key as PopupSettings["template_type"],
+                              })
+                            }
+                            className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                              popupSettings.template_type === tpl.key
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:bg-muted/40"
+                            }`}
+                          >
+                            <div className="text-xs font-semibold">{tpl.label}</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">{tpl.hint}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="flex items-center justify-between">
                       <div>
                         <Label>Enable Promo Popup</Label>
@@ -939,9 +1041,23 @@ const AdminSettings = () => {
                               }
                               className="mt-1"
                               placeholder="Book Now"
+                              disabled={popupSettings.template_type === "announcement"}
                             />
                           </div>
                         </div>
+                        {(popupSettings.template_type === "offer" || popupSettings.template_type === "stats") && (
+                          <div>
+                            <Label>Subtitle (optional)</Label>
+                            <Input
+                              value={popupSettings.subtitle}
+                              onChange={(e) =>
+                                setPopupSettings({ ...popupSettings, subtitle: e.target.value })
+                              }
+                              className="mt-1"
+                              placeholder="Secondary heading text"
+                            />
+                          </div>
+                        )}
                         <div>
                           <Label>Message</Label>
                           <Textarea
@@ -954,6 +1070,19 @@ const AdminSettings = () => {
                             placeholder="Describe your offer, free nights, early bird discount, etc."
                           />
                         </div>
+                        {popupSettings.template_type === "stats" && (
+                          <div>
+                            <Label>Stats Text</Label>
+                            <Input
+                              value={popupSettings.stats_text}
+                              onChange={(e) =>
+                                setPopupSettings({ ...popupSettings, stats_text: e.target.value })
+                              }
+                              className="mt-1"
+                              placeholder="10,000+ happy families"
+                            />
+                          </div>
+                        )}
                         <div className="grid gap-3 md:grid-cols-3">
                           <div>
                             <Label>CTA Link</Label>
@@ -964,6 +1093,7 @@ const AdminSettings = () => {
                               }
                               className="mt-1 text-xs"
                               placeholder="/stay/demo-stay or external URL"
+                              disabled={popupSettings.template_type === "announcement"}
                             />
                           </div>
                           <div>
@@ -1024,12 +1154,52 @@ const AdminSettings = () => {
                               }
                               className="mt-1 font-mono text-xs"
                               placeholder="WELCOME10"
+                              disabled={popupSettings.template_type === "announcement"}
                             />
                             <p className="text-[11px] text-muted-foreground mt-1">
-                              Type an existing coupon code to highlight it in the popup.
+                              {popupSettings.template_type === "coupon"
+                                ? "Guests will see this code in bold and can copy it."
+                                : "Type an existing coupon code to highlight it in the popup."}
                             </p>
                           </div>
                         </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div>
+                            <Label>Primary Color (optional)</Label>
+                            <Input
+                              value={popupSettings.primary_color}
+                              onChange={(e) =>
+                                setPopupSettings({
+                                  ...popupSettings,
+                                  primary_color: e.target.value,
+                                })
+                              }
+                              className="mt-1 text-xs font-mono"
+                              placeholder="#e11d48"
+                            />
+                          </div>
+                          <div>
+                            <Label>Background Color (optional)</Label>
+                            <Input
+                              value={popupSettings.background_color}
+                              onChange={(e) =>
+                                setPopupSettings({
+                                  ...popupSettings,
+                                  background_color: e.target.value,
+                                })
+                              }
+                              className="mt-1 text-xs font-mono"
+                              placeholder="#f8fafc"
+                            />
+                          </div>
+                        </div>
+                        {popupSettings.template_type === "lead" && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Lead template shows a form with Full Name + Phone (required), Email + Message (optional). Submissions will be saved in the new
+                            <span className="font-semibold"> Leads </span>
+                            page.
+                          </p>
+                        )}
                       </div>
                       <div className="hidden md:block">
                         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -1041,20 +1211,35 @@ const AdminSettings = () => {
                               <div className="h-24 bg-cover bg-center" style={{ backgroundImage: `url(${popupSettings.image_url})` }} />
                             )}
                             <div className="p-3 space-y-2">
+                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                Template: {popupSettings.template_type}
+                              </div>
                               <div className="text-sm font-semibold">
                                 {popupSettings.title || "Limited-time offer"}
                               </div>
+                              {(popupSettings.template_type === "offer" || popupSettings.template_type === "stats") && popupSettings.subtitle && (
+                                <div className="text-[11px] font-medium text-foreground/80">
+                                  {popupSettings.subtitle}
+                                </div>
+                              )}
                               <div className="text-[11px] text-muted-foreground line-clamp-3">
                                 {popupSettings.message || "Describe your best deal here to nudge guests to book."}
                               </div>
+                              {popupSettings.template_type === "stats" && popupSettings.stats_text && (
+                                <div className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                  {popupSettings.stats_text}
+                                </div>
+                              )}
                               {popupSettings.coupon_code && (
                                 <div className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-mono text-primary">
                                   COUPON: {popupSettings.coupon_code}
                                 </div>
                               )}
-                              <Button size="sm" className="mt-1 w-full">
-                                {popupSettings.cta_text || "Book Now"}
-                              </Button>
+                              {popupSettings.template_type !== "announcement" && (
+                                <Button size="sm" className="mt-1 w-full">
+                                  {popupSettings.cta_text || "Book Now"}
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </div>

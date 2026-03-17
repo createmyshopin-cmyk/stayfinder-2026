@@ -47,6 +47,7 @@ const AdminBanner          = lazy(() => import("./pages/admin/AdminBanner"));
 const AdminSeo             = lazy(() => import("./pages/admin/AdminSeo"));
 const AdminAnalytics       = lazy(() => import("./pages/admin/AdminAnalytics"));
 const AdminAccounting      = lazy(() => import("./pages/admin/AdminAccounting"));
+const AdminLeads           = lazy(() => import("./pages/admin/AdminLeads"));
 const AdminLayout          = lazy(() => import("./components/admin/AdminLayout").then(m => ({ default: m.AdminLayout })));
 
 // ─── SaaS-admin pages ─────────────────────────────────────────────────────────
@@ -125,6 +126,7 @@ const App = () => (
                 <Route path="rooms"           element={<AdminRoomCategories />} />
                 <Route path="bookings"        element={<AdminBookings />} />
                 <Route path="guest-contacts"   element={<AdminGuestContacts />} />
+                <Route path="leads"           element={<AdminLeads />} />
                 <Route path="coupons"         element={<AdminCoupons />} />
                 <Route path="calendar"        element={<AdminCalendar />} />
                 <Route path="ai-settings"     element={<AdminAISettings />} />

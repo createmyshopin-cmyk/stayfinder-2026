@@ -488,6 +488,7 @@ export type Database = {
           usage_count: number
           usage_limit: number | null
           value: number
+          show_publicly: boolean
         }
         Insert: {
           active?: boolean
@@ -505,6 +506,7 @@ export type Database = {
           usage_count?: number
           usage_limit?: number | null
           value?: number
+          show_publicly?: boolean
         }
         Update: {
           active?: boolean
@@ -522,10 +524,105 @@ export type Database = {
           usage_count?: number
           usage_limit?: number | null
           value?: number
+          show_publicly?: boolean
         }
         Relationships: [
           {
             foreignKeyName: "coupons_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          message: string
+          meta: Json
+          phone: string
+          source: string
+          status: string
+          tenant_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string
+          full_name: string
+          id?: string
+          message?: string
+          meta?: Json
+          phone: string
+          source?: string
+          status?: string
+          tenant_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          message?: string
+          meta?: Json
+          phone?: string
+          source?: string
+          status?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menu_items: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          is_available: boolean | null
+          name: string
+          price: number | null
+          sort_order: number | null
+          tenant_id: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean | null
+          name: string
+          price?: number | null
+          sort_order?: number | null
+          tenant_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_available?: boolean | null
+          name?: string
+          price?: number | null
+          sort_order?: number | null
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_items_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -769,6 +866,118 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      popup_settings: {
+        Row: {
+          background_color: string
+          coupon_code: string
+          created_at: string
+          cta_link: string
+          cta_text: string
+          delay_seconds: number
+          enabled: boolean
+          id: string
+          image_url: string
+          message: string
+          primary_color: string
+          show_once: boolean
+          stats_text: string
+          subtitle: string
+          template_type: string
+          tenant_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          background_color?: string
+          coupon_code?: string
+          created_at?: string
+          cta_link?: string
+          cta_text?: string
+          delay_seconds?: number
+          enabled?: boolean
+          id?: string
+          image_url?: string
+          message?: string
+          primary_color?: string
+          show_once?: boolean
+          stats_text?: string
+          subtitle?: string
+          template_type?: string
+          tenant_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          background_color?: string
+          coupon_code?: string
+          created_at?: string
+          cta_link?: string
+          cta_text?: string
+          delay_seconds?: number
+          enabled?: boolean
+          id?: string
+          image_url?: string
+          message?: string
+          primary_color?: string
+          show_once?: boolean
+          stats_text?: string
+          subtitle?: string
+          template_type?: string
+          tenant_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "popup_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_features: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string
+          icon_name: string
+          id: string
+          sort_order: number
+          tenant_id: string | null
+          title: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          icon_name?: string
+          id?: string
+          sort_order?: number
+          tenant_id?: string | null
+          title: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string
+          icon_name?: string
+          id?: string
+          sort_order?: number
+          tenant_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_features_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -1034,12 +1243,23 @@ export type Database = {
       site_settings: {
         Row: {
           address: string
+          best_features_enabled: boolean
+          best_features_title: string
           booking_enabled: boolean
+          clarity_id: string
           contact_email: string
           contact_phone: string
+          coupon_banner_enabled: boolean
           currency: string
+          fb_pixel_id: string
+          ga_id: string
+          gcal_calendar_id: string
+          gcal_enabled: boolean
+          gcal_webhook_url: string
           id: string
           maintenance_mode: boolean
+          menu_popup_enabled: boolean
+          menu_popup_title: string
           site_name: string
           social_facebook: string
           social_instagram: string
@@ -1054,12 +1274,23 @@ export type Database = {
         }
         Insert: {
           address?: string
+          best_features_enabled?: boolean
+          best_features_title?: string
           booking_enabled?: boolean
+          clarity_id?: string
           contact_email?: string
           contact_phone?: string
+          coupon_banner_enabled?: boolean
           currency?: string
+          fb_pixel_id?: string
+          ga_id?: string
+          gcal_calendar_id?: string
+          gcal_enabled?: boolean
+          gcal_webhook_url?: string
           id?: string
           maintenance_mode?: boolean
+          menu_popup_enabled?: boolean
+          menu_popup_title?: string
           site_name?: string
           social_facebook?: string
           social_instagram?: string
@@ -1074,12 +1305,23 @@ export type Database = {
         }
         Update: {
           address?: string
+          best_features_enabled?: boolean
+          best_features_title?: string
           booking_enabled?: boolean
+          clarity_id?: string
           contact_email?: string
           contact_phone?: string
+          coupon_banner_enabled?: boolean
           currency?: string
+          fb_pixel_id?: string
+          ga_id?: string
+          gcal_calendar_id?: string
+          gcal_enabled?: boolean
+          gcal_webhook_url?: string
           id?: string
           maintenance_mode?: boolean
+          menu_popup_enabled?: boolean
+          menu_popup_title?: string
           site_name?: string
           social_facebook?: string
           social_instagram?: string
